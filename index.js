@@ -153,6 +153,12 @@ async function getPaymentsPage(page = 1, limit = 5) {
     };
 }
 
+function getStatusText(status) {
+    if (status === "approved") return "✅ Tasdiqlangan";
+    if (status === "rejected") return "❌ Bekor qilingan";
+    return "⏳ Kutilmoqda";
+}
+
 function buildPaymentsText(result) {
     if (!result.items.length) {
         return "To‘lovlar ro‘yxati bo‘sh.";
@@ -169,7 +175,7 @@ function buildPaymentsText(result) {
         text += `${number}) ${item.full_name || "-"}\n`;
         text += `📞 ${item.phone || "-"}\n`;
         text += `💳 To‘lov qildi: ${paidText}\n`;
-        text += `📌 Status: ${item.status || "pending"}\n`;
+        text += `📌 Status: ${getStatusText(item.status)}\n`;
         text += `🕒 ${item.created_at ? new Date(item.created_at).toLocaleString() : "-"}\n\n`;
     });
     
