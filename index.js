@@ -1,9 +1,9 @@
 require("dotenv").config();
 
-const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const { Telegraf, Markup } = require("telegraf");
+const { createClient } = require("@supabase/supabase-js");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || "");
@@ -13,8 +13,22 @@ const VIDEO_FILE_ID_OR_URL = process.env.VIDEO_FILE_ID_OR_URL || "";
 const ADMIN_PANEL_PASSWORD = process.env.ADMIN_PANEL_PASSWORD || "12345";
 const PORT = Number(process.env.PORT || 3000);
 
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
 if (!BOT_TOKEN) throw new Error("BOT_TOKEN topilmadi");
 if (!ADMIN_CHAT_ID) throw new Error("ADMIN_CHAT_ID topilmadi");
+if (!SUPABASE_URL) throw new Error("SUPABASE_URL topilmadi");
+if (!SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY topilmadi");
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false
+    }
+});
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
@@ -23,37 +37,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/public", express.static(path.join(__dirname, "public")));
 
-const DATA_FILE = path.join(__dirname, "data.json");
-
-function loadData() {
-    if (!fs.existsSync(DATA_FILE)) {
-        return { payments: [] };
-    }
-    
-    try {
-        const raw = fs.readFileSync(DATA_FILE, "utf8");
-        const parsed = JSON.parse(raw);
-        
-        if (!parsed.payments || !Array.isArray(parsed.payments)) {
-            return { payments: [] };
-        }
-        
-        return parsed;
-    } catch (error) {
-        console.error("data.json o‘qishda xato:", error);
-        return { payments: [] };
-    }
-}
-
-function saveData(data) {
-    try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
-    } catch (error) {
-        console.error("data.json yozishda xato:", error);
-    }
-}
-
-const db = loadData();
 const sessions = new Map();
 
 function getSession(userId) {
@@ -75,44 +58,76 @@ function resetSession(userId) {
     });
 }
 
-function createPaymentRequest(user) {
+async function createPaymentRequest(user) {
     const id = Date.now().toString();
     
-    const payment = {
+    const payload = {
         id,
-        userId: user.userId,
-        chatId: user.chatId,
+        user_id: user.userId,
+        chat_id: user.chatId,
         username: user.username || "",
-        firstName: user.firstName || "",
+        first_name: user.firstName || "",
         phone: user.phone || "",
-        fullName: user.fullName || "",
+        full_name: user.fullName || "",
         status: "pending",
         paid: false,
-        createdAt: new Date().toISOString(),
-        screenshotFileId: "",
-        approvedAt: null,
-        rejectedAt: null,
-        inviteLink: ""
+        screenshot_file_id: "",
+        invite_link: ""
     };
     
-    db.payments.unshift(payment);
-    saveData(db);
+    const { data, error } = await supabase
+    .from("payments")
+    .insert(payload)
+    .select()
+    .single();
     
-    return payment;
+    if (error) throw error;
+    
+    return data;
 }
 
-function findPaymentById(id) {
-    return db.payments.find((item) => item.id === id);
+async function findPaymentById(id) {
+    const { data, error } = await supabase
+    .from("payments")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+    
+    if (error) throw error;
+    
+    return data;
 }
 
-function updatePayment(id, patch) {
-    const payment = db.payments.find((item) => item.id === id);
-    if (!payment) return null;
+async function updatePayment(id, patch) {
+    const { data, error } = await supabase
+    .from("payments")
+    .update(patch)
+    .eq("id", id)
+    .select()
+    .single();
     
-    Object.assign(payment, patch);
-    saveData(db);
+    if (error) throw error;
     
-    return payment;
+    return data;
+}
+
+async function getPaymentStats() {
+    const { data, error } = await supabase
+    .from("payments")
+    .select("status");
+    
+    if (error) throw error;
+    
+    const pending = data.filter((item) => item.status === "pending").length;
+    const approved = data.filter((item) => item.status === "approved").length;
+    const rejected = data.filter((item) => item.status === "rejected").length;
+    
+    return {
+        pending,
+        approved,
+        rejected,
+        total: data.length
+    };
 }
 
 async function sendCourseVideo(ctx) {
@@ -165,6 +180,7 @@ bot.on("contact", async (ctx) => {
     if (session.step !== "awaiting_phone") return;
     
     const contact = ctx.message.contact;
+    
     if (!contact) {
         await ctx.reply("Telefon raqam yuboring.");
         return;
@@ -252,41 +268,46 @@ bot.on("photo", async (ctx, next) => {
         return;
     }
     
-    const payment = createPaymentRequest({
-        userId,
-        chatId: String(ctx.chat.id),
-        username: ctx.from.username || "",
-        firstName: ctx.from.first_name || "",
-        phone: session.phone,
-        fullName: session.fullName
-    });
-    
-    updatePayment(payment.id, {
-        screenshotFileId: largestPhoto.file_id
-    });
-    
-    const adminCaption =
-    `🧾 Yangi to‘lov skrinshoti\n\n` +
-    `ID: ${payment.id}\n` +
-    `Ism familiya: ${session.fullName}\n` +
-    `Telefon: ${session.phone}\n` +
-    `Username: ${ctx.from.username ? "@" + ctx.from.username : "yo‘q"}\n` +
-    `User ID: ${userId}\n` +
-    `Status: Kutilmoqda`;
-    
-    await bot.telegram.sendPhoto(ADMIN_CHAT_ID, largestPhoto.file_id, {
-        caption: adminCaption,
-        ...Markup.inlineKeyboard([
-            [
-                Markup.button.callback("✅ Tasdiqlash", `approve_${payment.id}`),
-                Markup.button.callback("❌ Bekor qilish", `reject_${payment.id}`)
-            ]
-        ])
-    });
-    
-    session.step = "waiting_admin";
-    
-    await ctx.reply("✅ Skrinshot adminga yuborildi.\n\nTasdiqlanishini kuting.");
+    try {
+        const payment = await createPaymentRequest({
+            userId,
+            chatId: String(ctx.chat.id),
+            username: ctx.from.username || "",
+            firstName: ctx.from.first_name || "",
+            phone: session.phone,
+            fullName: session.fullName
+        });
+        
+        await updatePayment(payment.id, {
+            screenshot_file_id: largestPhoto.file_id
+        });
+        
+        const adminCaption =
+        `🧾 Yangi to‘lov skrinshoti\n\n` +
+        `ID: ${payment.id}\n` +
+        `Ism familiya: ${session.fullName}\n` +
+        `Telefon: ${session.phone}\n` +
+        `Username: ${ctx.from.username ? "@" + ctx.from.username : "yo‘q"}\n` +
+        `User ID: ${userId}\n` +
+        `Status: Kutilmoqda`;
+        
+        await bot.telegram.sendPhoto(ADMIN_CHAT_ID, largestPhoto.file_id, {
+            caption: adminCaption,
+            ...Markup.inlineKeyboard([
+                [
+                    Markup.button.callback("✅ Tasdiqlash", `approve_${payment.id}`),
+                    Markup.button.callback("❌ Bekor qilish", `reject_${payment.id}`)
+                ]
+            ])
+        });
+        
+        session.step = "waiting_admin";
+        
+        await ctx.reply("✅ Skrinshot adminga yuborildi.\n\nTasdiqlanishini kuting.");
+    } catch (error) {
+        console.error("Photo handler xato:", error);
+        await ctx.reply("Saqlashda xatolik bo‘ldi.");
+    }
 });
 
 bot.action(/approve_(.+)/, async (ctx) => {
@@ -296,45 +317,46 @@ bot.action(/approve_(.+)/, async (ctx) => {
     }
     
     const paymentId = ctx.match[1];
-    const payment = findPaymentById(paymentId);
-    
-    if (!payment) {
-        await ctx.answerCbQuery("To‘lov topilmadi");
-        return;
-    }
-    
-    if (payment.status === "approved") {
-        await ctx.answerCbQuery("Bu to‘lov avval tasdiqlangan");
-        return;
-    }
-    
-    if (!COURSE_CHAT_ID) {
-        await ctx.answerCbQuery("COURSE_CHAT_ID yozilmagan");
-        await bot.telegram.sendMessage(
-            ADMIN_CHAT_ID,
-            "⚠️ COURSE_CHAT_ID yozilmagan."
-        );
-        return;
-    }
     
     try {
+        const payment = await findPaymentById(paymentId);
+        
+        if (!payment) {
+            await ctx.answerCbQuery("To‘lov topilmadi");
+            return;
+        }
+        
+        if (payment.status === "approved") {
+            await ctx.answerCbQuery("Bu to‘lov avval tasdiqlangan");
+            return;
+        }
+        
+        if (!COURSE_CHAT_ID) {
+            await ctx.answerCbQuery("COURSE_CHAT_ID yozilmagan");
+            await bot.telegram.sendMessage(
+                ADMIN_CHAT_ID,
+                "⚠️ COURSE_CHAT_ID yozilmagan."
+            );
+            return;
+        }
+        
         const expireDate = Math.floor(Date.now() / 1000) + 60 * 60 * 24;
         
         const invite = await bot.telegram.createChatInviteLink(COURSE_CHAT_ID, {
-            name: `course_${payment.userId}_${payment.id}`,
+            name: `course_${payment.user_id}_${payment.id}`,
             member_limit: 1,
             expire_date: expireDate
         });
         
-        updatePayment(paymentId, {
+        await updatePayment(paymentId, {
             status: "approved",
             paid: true,
-            approvedAt: new Date().toISOString(),
-            inviteLink: invite.invite_link
+            approved_at: new Date().toISOString(),
+            invite_link: invite.invite_link
         });
         
         await bot.telegram.sendMessage(
-            payment.chatId,
+            payment.chat_id,
             `✅ To‘lovingiz tasdiqlandi.\n\nKursga kirish havolasi:\n${invite.invite_link}`
         );
         
@@ -343,7 +365,7 @@ bot.action(/approve_(.+)/, async (ctx) => {
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.answerCbQuery("Tasdiqlandi");
     } catch (error) {
-        console.error("Tasdiqlashda xato:", error);
+        console.error("Approve xato:", error);
         await ctx.answerCbQuery("Xatolik bo‘ldi");
     }
 });
@@ -355,44 +377,53 @@ bot.action(/reject_(.+)/, async (ctx) => {
     }
     
     const paymentId = ctx.match[1];
-    const payment = findPaymentById(paymentId);
     
-    if (!payment) {
-        await ctx.answerCbQuery("To‘lov topilmadi");
-        return;
+    try {
+        const payment = await findPaymentById(paymentId);
+        
+        if (!payment) {
+            await ctx.answerCbQuery("To‘lov topilmadi");
+            return;
+        }
+        
+        await updatePayment(paymentId, {
+            status: "rejected",
+            paid: false,
+            rejected_at: new Date().toISOString()
+        });
+        
+        await bot.telegram.sendMessage(
+            payment.chat_id,
+            "❌ To‘lov tasdiqlanmadi.\n\nIltimos, qayta tekshirib yuboring."
+        );
+        
+        const oldCaption = ctx.callbackQuery.message.caption || "";
+        await ctx.editMessageCaption(`${oldCaption}\n\n❌ BEKOR QILINDI`);
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+        await ctx.answerCbQuery("Bekor qilindi");
+    } catch (error) {
+        console.error("Reject xato:", error);
+        await ctx.answerCbQuery("Xatolik bo‘ldi");
     }
-    
-    updatePayment(paymentId, {
-        status: "rejected",
-        paid: false,
-        rejectedAt: new Date().toISOString()
-    });
-    
-    await bot.telegram.sendMessage(
-        payment.chatId,
-        "❌ To‘lov tasdiqlanmadi.\n\nIltimos, qayta tekshirib yuboring."
-    );
-    
-    const oldCaption = ctx.callbackQuery.message.caption || "";
-    await ctx.editMessageCaption(`${oldCaption}\n\n❌ BEKOR QILINDI`);
-    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
-    await ctx.answerCbQuery("Bekor qilindi");
 });
 
 bot.command("admin", async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_CHAT_ID) return;
     
-    const pending = db.payments.filter((p) => p.status === "pending").length;
-    const approved = db.payments.filter((p) => p.status === "approved").length;
-    const rejected = db.payments.filter((p) => p.status === "rejected").length;
-    
-    await ctx.reply(
-        `📊 Statistika\n\n` +
-        `Kutilmoqda: ${pending}\n` +
-        `Tasdiqlangan: ${approved}\n` +
-        `Bekor qilingan: ${rejected}\n` +
-        `Jami: ${db.payments.length}`
-    );
+    try {
+        const stats = await getPaymentStats();
+        
+        await ctx.reply(
+            `📊 Statistika\n\n` +
+            `Kutilmoqda: ${stats.pending}\n` +
+            `Tasdiqlangan: ${stats.approved}\n` +
+            `Bekor qilingan: ${stats.rejected}\n` +
+            `Jami: ${stats.total}`
+        );
+    } catch (error) {
+        console.error("Admin stats xato:", error);
+        await ctx.reply("Statistikani olishda xatolik bo‘ldi.");
+    }
 });
 
 function checkAdminPanelAuth(req, res, next) {
@@ -413,33 +444,44 @@ app.get("/admin", (req, res) => {
     res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 
-app.get("/admin/api/payments", checkAdminPanelAuth, (req, res) => {
-    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
-    const limit = Math.max(parseInt(req.query.limit || "10", 10), 1);
-    
-    const sortedPayments = [...db.payments].sort((a, b) => {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-    
-    const total = sortedPayments.length;
-    const totalPages = Math.ceil(total / limit) || 1;
-    const start = (page - 1) * limit;
-    const items = sortedPayments.slice(start, start + limit).map((item) => ({
-        id: item.id,
-        fullName: item.fullName || "",
-        phone: item.phone || "",
-        paid: item.paid === true,
-        status: item.status || "pending",
-        createdAt: item.createdAt || ""
-    }));
-    
-    res.json({
-        page,
-        limit,
-        total,
-        totalPages,
-        items
-    });
+app.get("/admin/api/payments", checkAdminPanelAuth, async (req, res) => {
+    try {
+        const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+        const limit = Math.max(parseInt(req.query.limit || "10", 10), 1);
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+        
+        const { data, count, error } = await supabase
+        .from("payments")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+        
+        if (error) throw error;
+        
+        const total = count || 0;
+        const totalPages = Math.ceil(total / limit) || 1;
+        
+        const items = (data || []).map((item) => ({
+            id: item.id,
+            fullName: item.full_name || "",
+            phone: item.phone || "",
+            paid: item.paid === true,
+            status: item.status || "pending",
+            createdAt: item.created_at || ""
+        }));
+        
+        res.json({
+            page,
+            limit,
+            total,
+            totalPages,
+            items
+        });
+    } catch (error) {
+        console.error("Admin API xato:", error);
+        res.status(500).json({ error: "Server xatosi" });
+    }
 });
 
 async function startBot() {
