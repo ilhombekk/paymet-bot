@@ -212,6 +212,13 @@ function buildPaymentsKeyboard(page, totalPages) {
     ]);
 }
 
+function getMainKeyboard() {
+    return Markup.keyboard([
+        [Markup.button.contactRequest("📱 Telefon raqamni yuborish")],
+        ["📊 Statistika", "💳 To‘lovlar"]
+    ]).resize();
+}
+
 async function sendCourseVideo(ctx) {
     if (!VIDEO_FILE_ID_OR_URL) {
         await ctx.reply("Video hozircha sozlanmagan.");
@@ -247,11 +254,7 @@ bot.start(async (ctx) => {
     
     await ctx.reply(
         "Assalomu alaykum.\n\nTelefon raqamingizni yuboring:",
-        Markup.keyboard([
-            [Markup.button.contactRequest("📱 Telefon raqamni yuborish")]
-        ])
-        .resize()
-        .oneTime()
+        getMainKeyboard()
     );
 });
 
@@ -291,6 +294,51 @@ bot.on("text", async (ctx, next) => {
     
     const userId = String(ctx.from.id);
     const session = getSession(userId);
+    
+    if (text === "📊 Statistika") {
+        if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+            await ctx.reply("❌ Siz admin emassiz");
+            return;
+        }
+        
+        try {
+            const stats = await getPaymentStats();
+            
+            await ctx.reply(
+                `📊 Statistika\n\n` +
+                `Kutilmoqda: ${stats.pending}\n` +
+                `Tasdiqlangan: ${stats.approved}\n` +
+                `Bekor qilingan: ${stats.rejected}\n` +
+                `Jami: ${stats.total}`,
+                getMainKeyboard()
+            );
+        } catch (error) {
+            console.error("Statistika xato:", error);
+            await ctx.reply("Statistikani olishda xatolik bo‘ldi.");
+        }
+        return;
+    }
+    
+    if (text === "💳 To‘lovlar") {
+        if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+            await ctx.reply("❌ Siz admin emassiz");
+            return;
+        }
+        
+        try {
+            const result = await getPaymentsPage(1, 5);
+            const paymentsText = buildPaymentsText(result);
+            
+            await ctx.reply(
+                paymentsText,
+                buildPaymentsKeyboard(result.page, result.totalPages)
+            );
+        } catch (error) {
+            console.error("To‘lovlar xato:", error);
+            await ctx.reply("To‘lovlar ro‘yxatini olib bo‘lmadi.");
+        }
+        return;
+    }
     
     if (session.step === "awaiting_name") {
         session.fullName = text.trim();
@@ -490,7 +538,10 @@ bot.action(/reject_(.+)/, async (ctx) => {
 });
 
 bot.command("admin", async (ctx) => {
-    if (String(ctx.from.id) !== ADMIN_CHAT_ID) return;
+    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+        await ctx.reply("❌ Siz admin emassiz");
+        return;
+    }
     
     try {
         const stats = await getPaymentStats();
@@ -500,7 +551,8 @@ bot.command("admin", async (ctx) => {
             `Kutilmoqda: ${stats.pending}\n` +
             `Tasdiqlangan: ${stats.approved}\n` +
             `Bekor qilingan: ${stats.rejected}\n` +
-            `Jami: ${stats.total}`
+            `Jami: ${stats.total}`,
+            getMainKeyboard()
         );
     } catch (error) {
         console.error("Admin stats xato:", error);
