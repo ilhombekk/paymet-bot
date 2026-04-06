@@ -1,0 +1,49 @@
+{
+  "payments": [
+    {
+      "id": "1775468702642",
+      "userId": "447471345",
+      "chatId": "447471345",
+      "username": "learnncode",
+      "firstName": "Saidov",
+      "phone": "+998884832500",
+      "fullName": "ilhom saidov",
+      "status": "pending",
+      "createdAt": "2026-04-06T09:45:02.642Z",
+      "screenshotFileId": "AgACAgIAAxkBAAMMadOAnsML3n0RGMs94kX7aoBKYb0AAioXaxu42JlKixdPN3gMxVoBAAMCAAN4AAM7BA",
+      "approvedAt": null,
+      "rejectedAt": null,
+      "inviteLink": ""
+    },
+    {
+      "id": "1775469959254",
+      "userId": "447471345",
+      "chatId": "447471345",
+      "username": "learnncode",
+      "firstName": "Saidov",
+      "phone": "+998884832500",
+      "fullName": "ilhom saidov",
+      "status": "approved",
+      "createdAt": "2026-04-06T10:05:59.254Z",
+      "screenshotFileId": "AgACAgIAAxkBAAMdadOFh0Z8EjxiXJGADjsZepzdIaIAAkYXaxu42JlK8AvQYH8-1SEBAAMCAAN4AAM7BA",
+      "approvedAt": "2026-04-06T10:10:08.115Z",
+      "rejectedAt": null,
+      "inviteLink": "https://t.me/+1vGIrc27Bds3Yzky"
+    },
+    {
+      "id": "1775471152467",
+      "userId": "447471345",
+      "chatId": "447471345",
+      "username": "learnncode",
+      "firstName": "Saidov",
+      "phone": "+998884832500",
+      "fullName": "ilhom saidov",
+      "status": "approved",
+      "createdAt": "2026-04-06T10:25:52.467Z",
+      "screenshotFileId": "AgACAgIAAxkBAAMsadOKMCYoznEwcUrtBpt2gSBRHBwAAtMUaxu42KFKKK8UlszFQ-cBAAMCAAN4AAM7BA",
+      "approvedAt": "2026-04-06T10:26:04.628Z",
+      "rejectedAt": null,
+      "inviteLink": "https://t.me/+pIJFLQ-Fg7EzYzli"
+    }
+  ]
+}
