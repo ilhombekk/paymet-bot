@@ -5,150 +5,441 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Admin Panel</title>
     <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #0f172a;
-            color: white;
-        }
-        
-        .container {
-            max-width: 1100px;
-            margin: 40px auto;
-            padding: 20px;
-        }
-        
-        h1 {
-            margin-bottom: 20px;
-        }
-        
-        .login-box,
-        .table-box {
-            background: #111827;
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-        }
-        
-        input {
-            width: 100%;
-            padding: 12px;
-            border-radius: 10px;
-            border: 1px solid #374151;
-            background: #1f2937;
-            color: white;
-            margin-bottom: 12px;
+        * {
             box-sizing: border-box;
         }
         
-        button {
-            padding: 12px 18px;
-            border: none;
-            border-radius: 10px;
-            background: #2563eb;
-            color: white;
-            cursor: pointer;
+        :root {
+            --bg: #0f172a;
+            --card: #111827;
+            --card-2: #1f2937;
+            --border: #334155;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success-bg: #064e3b;
+            --success-text: #d1fae5;
+            --danger-bg: #7f1d1d;
+            --danger-text: #fee2e2;
+            --warning-bg: #78350f;
+            --warning-text: #fde68a;
         }
         
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
         }
         
-        table {
+        .container {
             width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 16px;
         }
         
-        th, td {
-            padding: 14px 10px;
-            text-align: left;
-            border-bottom: 1px solid #374151;
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 8px 0 18px;
         }
         
-        th {
-            color: #93c5fd;
-        }
-        
-        .badge {
-            display: inline-block;
-            padding: 6px 10px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        
-        .paid {
-            background: #065f46;
-            color: #d1fae5;
-        }
-        
-        .unpaid {
-            background: #7f1d1d;
-            color: #fee2e2;
-        }
-        
-        .pending {
-            background: #78350f;
-            color: #fde68a;
-        }
-        
-        .pagination {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-            align-items: center;
-            flex-wrap: wrap;
+        .card {
+            background: var(--card);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+            border: 1px solid rgba(255,255,255,0.04);
         }
         
         .hidden {
             display: none;
         }
         
+        .login-title,
+        .section-title {
+            margin: 0 0 10px;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
         .muted {
-            color: #9ca3af;
+            color: var(--muted);
             font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .input {
+            width: 100%;
+            padding: 14px 14px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--card-2);
+            color: var(--text);
+            outline: none;
+            font-size: 16px;
+            margin-top: 14px;
+            margin-bottom: 12px;
+        }
+        
+        .input:focus {
+            border-color: var(--primary);
+        }
+        
+        .btn {
+            border: none;
+            border-radius: 12px;
+            padding: 12px 16px;
+            background: var(--primary);
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s ease;
+        }
+        
+        .btn:hover {
+            background: var(--primary-hover);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: #334155;
+        }
+        
+        .btn-secondary:hover {
+            background: #475569;
+        }
+        
+        .header-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+        
+        .summary-boxes {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .summary-card {
+            background: var(--card-2);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px;
+        }
+        
+        .summary-label {
+            color: var(--muted);
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+        
+        .summary-value {
+            font-size: 22px;
+            font-weight: 700;
+        }
+        
+        .desktop-table-wrap {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            display: block;
+        }
+        
+        table {
+            width: 100%;
+            min-width: 760px;
+            border-collapse: collapse;
+            background: transparent;
+        }
+        
+        th, td {
+            padding: 14px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+            vertical-align: top;
+        }
+        
+        th {
+            color: #93c5fd;
+            font-weight: 700;
+            background: rgba(255,255,255,0.02);
+        }
+        
+        tbody tr:hover {
+            background: rgba(255,255,255,0.02);
+        }
+        
+        .mobile-list {
+            display: none;
+            gap: 12px;
+            flex-direction: column;
+        }
+        
+        .mobile-item {
+            background: var(--card-2);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px;
+        }
+        
+        .mobile-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .mobile-index {
+            font-size: 13px;
+            color: var(--muted);
+        }
+        
+        .mobile-name {
+            font-size: 17px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            line-height: 1.35;
+        }
+        
+        .mobile-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        
+        .field-label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+        
+        .field-value {
+            font-size: 14px;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        
+        .badges {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 2px;
+        }
+        
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        
+        .paid {
+            background: var(--success-bg);
+            color: var(--success-text);
+        }
+        
+        .unpaid {
+            background: var(--danger-bg);
+            color: var(--danger-text);
+        }
+        
+        .pending {
+            background: var(--warning-bg);
+            color: var(--warning-text);
+        }
+        
+        .pagination {
+            margin-top: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .pagination-info {
+            color: var(--muted);
+            font-size: 14px;
+        }
+        
+        .pagination-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 30px 10px;
+            color: var(--muted);
+            font-size: 15px;
+        }
+        
+        @media (max-width: 900px) {
+            .summary-boxes {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        
+        @media (max-width: 640px) {
+            .container {
+                padding: 12px;
+            }
+            
+            .page-title {
+                font-size: 24px;
+                margin: 6px 0 14px;
+            }
+            
+            .card {
+                padding: 14px;
+                border-radius: 16px;
+            }
+            
+            .login-title,
+            .section-title {
+                font-size: 18px;
+            }
+            
+            .summary-boxes {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+            
+            .summary-card {
+                padding: 12px;
+            }
+            
+            .summary-value {
+                font-size: 18px;
+            }
+            
+            .desktop-table-wrap {
+                display: none;
+            }
+            
+            .mobile-list {
+                display: flex;
+            }
+            
+            .pagination {
+                align-items: stretch;
+            }
+            
+            .pagination-actions {
+                width: 100%;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .pagination-actions .btn {
+                width: 100%;
+            }
+        }
+        
+        @media (max-width: 420px) {
+            .summary-boxes {
+                grid-template-columns: 1fr;
+            }
+            
+            .pagination-actions {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Admin Panel</h1>
+        <div class="page-title">Admin Panel</div>
         
-        <div id="loginBox" class="login-box">
-            <h3>Kirish</h3>
-            <input type="password" id="passwordInput" placeholder="Admin parolni kiriting" />
-            <button onclick="login()">Kirish</button>
+        <div id="loginBox" class="card">
+            <div class="login-title">Kirish</div>
+            <div class="muted">Admin panelga kirish uchun parolni kiriting.</div>
+            <input
+            type="password"
+            id="passwordInput"
+            class="input"
+            placeholder="Admin parolni kiriting"
+            />
+            <button class="btn" onclick="login()">Kirish</button>
         </div>
         
-        <div id="tableBox" class="table-box hidden">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div id="tableBox" class="card hidden">
+            <div class="header-row">
                 <div>
-                    <h3 style="margin:0;">To‘lovlar ro‘yxati</h3>
-                    <div id="summary" class="muted"></div>
+                    <div class="section-title">To‘lovlar ro‘yxati</div>
+                    <div id="summaryText" class="muted">Ma’lumot yuklanmoqda...</div>
                 </div>
-                <button onclick="logout()">Chiqish</button>
+                <button class="btn btn-secondary" onclick="logout()">Chiqish</button>
             </div>
             
-            <table>
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Ism familiya</th>
-                        <th>Telefon</th>
-                        <th>To‘lov holati</th>
-                        <th>Status</th>
-                        <th>Sana</th>
-                    </tr>
-                </thead>
-                <tbody id="paymentsTableBody"></tbody>
-            </table>
+            <div class="summary-boxes">
+                <div class="summary-card">
+                    <div class="summary-label">Jami</div>
+                    <div id="totalCount" class="summary-value">0</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">To‘lov qildi</div>
+                    <div id="paidCount" class="summary-value">0</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Kutilmoqda</div>
+                    <div id="pendingCount" class="summary-value">0</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Bekor qilingan</div>
+                    <div id="rejectedCount" class="summary-value">0</div>
+                </div>
+            </div>
+            
+            <div class="desktop-table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Ism familiya</th>
+                            <th>Telefon</th>
+                            <th>To‘lov holati</th>
+                            <th>Status</th>
+                            <th>Sana</th>
+                        </tr>
+                    </thead>
+                    <tbody id="paymentsTableBody"></tbody>
+                </table>
+            </div>
+            
+            <div id="mobileList" class="mobile-list"></div>
+            
+            <div id="emptyState" class="empty-state hidden">
+                Hozircha ma’lumot yo‘q.
+            </div>
             
             <div class="pagination">
-                <button id="prevBtn" onclick="changePage(-1)">Oldingi</button>
-                <span id="pageInfo"></span>
-                <button id="nextBtn" onclick="changePage(1)">Keyingi</button>
+                <div id="pageInfo" class="pagination-info">Sahifa 1 / 1</div>
+                <div class="pagination-actions">
+                    <button id="prevBtn" class="btn btn-secondary" onclick="changePage(-1)">Oldingi</button>
+                    <button id="nextBtn" class="btn" onclick="changePage(1)">Keyingi</button>
+                </div>
             </div>
         </div>
     </div>
@@ -160,6 +451,7 @@
         
         function login() {
             const value = document.getElementById("passwordInput").value.trim();
+            
             if (!value) {
                 alert("Parol kiriting");
                 return;
@@ -174,6 +466,7 @@
             localStorage.removeItem("admin_panel_password");
             adminPassword = "";
             currentPage = 1;
+            
             document.getElementById("tableBox").classList.add("hidden");
             document.getElementById("loginBox").classList.remove("hidden");
         }
@@ -185,10 +478,9 @@
         }
         
         function paymentBadge(paid) {
-            if (paid) {
-                return '<span class="badge paid">To‘lov qildi</span>';
-            }
-            return '<span class="badge unpaid">To‘lov qilmadi</span>';
+            return paid
+            ? '<span class="badge paid">To‘lov qildi</span>'
+            : '<span class="badge unpaid">To‘lov qilmadi</span>';
         }
         
         function statusBadge(status) {
@@ -199,6 +491,78 @@
                 return '<span class="badge unpaid">Bekor qilingan</span>';
             }
             return '<span class="badge pending">Kutilmoqda</span>';
+        }
+        
+        function renderDesktopRows(data) {
+            const tbody = document.getElementById("paymentsTableBody");
+            tbody.innerHTML = "";
+            
+            data.items.forEach((item, index) => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+          <td>${(data.page - 1) * data.limit + index + 1}</td>
+          <td>${item.fullName || "-"}</td>
+          <td>${item.phone || "-"}</td>
+          <td>${paymentBadge(item.paid)}</td>
+          <td>${statusBadge(item.status)}</td>
+          <td>${formatDate(item.createdAt)}</td>
+        `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        function renderMobileRows(data) {
+            const mobileList = document.getElementById("mobileList");
+            mobileList.innerHTML = "";
+            
+            data.items.forEach((item, index) => {
+                const div = document.createElement("div");
+                div.className = "mobile-item";
+                
+                div.innerHTML = `
+          <div class="mobile-top">
+            <div class="mobile-index">#${(data.page - 1) * data.limit + index + 1}</div>
+            <div class="badges">
+              ${paymentBadge(item.paid)}
+            </div>
+          </div>
+
+          <div class="mobile-name">${item.fullName || "-"}</div>
+
+          <div class="mobile-grid">
+            <div>
+              <div class="field-label">Telefon</div>
+              <div class="field-value">${item.phone || "-"}</div>
+            </div>
+
+            <div>
+              <div class="field-label">Status</div>
+              <div class="field-value">${statusBadge(item.status)}</div>
+            </div>
+
+            <div>
+              <div class="field-label">Sana</div>
+              <div class="field-value">${formatDate(item.createdAt)}</div>
+            </div>
+          </div>
+        `;
+                
+                mobileList.appendChild(div);
+            });
+        }
+        
+        function renderSummary(data) {
+            const paidCount = data.items.filter(item => item.paid === true).length;
+            const pendingCount = data.items.filter(item => item.status === "pending").length;
+            const rejectedCount = data.items.filter(item => item.status === "rejected").length;
+            
+            document.getElementById("summaryText").textContent =
+            `Jami: ${data.total} ta foydalanuvchi`;
+            
+            document.getElementById("totalCount").textContent = data.total;
+            document.getElementById("paidCount").textContent = paidCount;
+            document.getElementById("pendingCount").textContent = pendingCount;
+            document.getElementById("rejectedCount").textContent = rejectedCount;
         }
         
         async function loadPayments() {
@@ -221,27 +585,15 @@
                 document.getElementById("loginBox").classList.add("hidden");
                 document.getElementById("tableBox").classList.remove("hidden");
                 
-                const tbody = document.getElementById("paymentsTableBody");
-                tbody.innerHTML = "";
+                const isEmpty = !data.items || data.items.length === 0;
+                document.getElementById("emptyState").classList.toggle("hidden", !isEmpty);
                 
-                data.items.forEach((item, index) => {
-                    const tr = document.createElement("tr");
-                    tr.innerHTML = `
-            <td>${(data.page - 1) * data.limit + index + 1}</td>
-            <td>${item.fullName || "-"}</td>
-            <td>${item.phone || "-"}</td>
-            <td>${paymentBadge(item.paid)}</td>
-            <td>${statusBadge(item.status)}</td>
-            <td>${formatDate(item.createdAt)}</td>
-          `;
-                    tbody.appendChild(tr);
-                });
+                renderDesktopRows(data);
+                renderMobileRows(data);
+                renderSummary(data);
                 
                 document.getElementById("pageInfo").textContent =
                 `Sahifa ${data.page} / ${data.totalPages}`;
-                
-                document.getElementById("summary").textContent =
-                `Jami: ${data.total} ta foydalanuvchi`;
                 
                 document.getElementById("prevBtn").disabled = data.page <= 1;
                 document.getElementById("nextBtn").disabled = data.page >= data.totalPages;
