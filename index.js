@@ -72,6 +72,19 @@ function formatTashkentDate(dateValue) {
     });
 }
 
+function getUserKeyboard() {
+    return Markup.keyboard([
+        [Markup.button.contactRequest("📱 Telefon raqamni yuborish")]
+    ]).resize();
+}
+
+function getAdminKeyboard() {
+    return Markup.keyboard([
+        [Markup.button.contactRequest("📱 Telefon raqamni yuborish")],
+        ["📊 Statistika", "💳 To‘lovlar"]
+    ]).resize();
+}
+
 async function createPaymentRequest(user) {
     const id = Date.now().toString();
     
@@ -212,13 +225,6 @@ function buildPaymentsKeyboard(page, totalPages) {
     ]);
 }
 
-function getMainKeyboard() {
-    return Markup.keyboard([
-        [Markup.button.contactRequest("📱 Telefon raqamni yuborish")],
-        ["📊 Statistika", "💳 To‘lovlar"]
-    ]).resize();
-}
-
 async function sendCourseVideo(ctx) {
     if (!VIDEO_FILE_ID_OR_URL) {
         await ctx.reply("Video hozircha sozlanmagan.");
@@ -252,9 +258,12 @@ bot.start(async (ctx) => {
     const session = getSession(userId);
     session.step = "awaiting_phone";
     
+    const keyboard =
+    userId === ADMIN_CHAT_ID ? getAdminKeyboard() : getUserKeyboard();
+    
     await ctx.reply(
         "Assalomu alaykum.\n\nTelefon raqamingizni yuboring:",
-        getMainKeyboard()
+        keyboard
     );
 });
 
@@ -287,16 +296,15 @@ bot.on("contact", async (ctx) => {
 
 bot.on("text", async (ctx, next) => {
     const text = ctx.message.text;
+    const userId = String(ctx.from.id);
+    const session = getSession(userId);
     
     if (text.startsWith("/")) {
         return next();
     }
     
-    const userId = String(ctx.from.id);
-    const session = getSession(userId);
-    
     if (text === "📊 Statistika") {
-        if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+        if (userId !== ADMIN_CHAT_ID) {
             await ctx.reply("❌ Siz admin emassiz");
             return;
         }
@@ -310,7 +318,7 @@ bot.on("text", async (ctx, next) => {
                 `Tasdiqlangan: ${stats.approved}\n` +
                 `Bekor qilingan: ${stats.rejected}\n` +
                 `Jami: ${stats.total}`,
-                getMainKeyboard()
+                getAdminKeyboard()
             );
         } catch (error) {
             console.error("Statistika xato:", error);
@@ -320,7 +328,7 @@ bot.on("text", async (ctx, next) => {
     }
     
     if (text === "💳 To‘lovlar") {
-        if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+        if (userId !== ADMIN_CHAT_ID) {
             await ctx.reply("❌ Siz admin emassiz");
             return;
         }
@@ -552,7 +560,7 @@ bot.command("admin", async (ctx) => {
             `Tasdiqlangan: ${stats.approved}\n` +
             `Bekor qilingan: ${stats.rejected}\n` +
             `Jami: ${stats.total}`,
-            getMainKeyboard()
+            getAdminKeyboard()
         );
     } catch (error) {
         console.error("Admin stats xato:", error);
