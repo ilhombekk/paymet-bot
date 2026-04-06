@@ -58,6 +58,20 @@ function resetSession(userId) {
     });
 }
 
+function formatTashkentDate(dateValue) {
+    if (!dateValue) return "-";
+    
+    return new Date(dateValue).toLocaleString("uz-UZ", {
+        timeZone: "Asia/Tashkent",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+    });
+}
+
 async function createPaymentRequest(user) {
     const id = Date.now().toString();
     
@@ -176,7 +190,7 @@ function buildPaymentsText(result) {
         text += `📞 ${item.phone || "-"}\n`;
         text += `💳 To‘lov qildi: ${paidText}\n`;
         text += `📌 Status: ${getStatusText(item.status)}\n`;
-        text += `🕒 ${item.created_at ? new Date(item.created_at).toLocaleString() : "-"}\n\n`;
+        text += `🕒 ${formatTashkentDate(item.created_at)}\n\n`;
     });
     
     return text;
@@ -496,6 +510,7 @@ bot.command("admin", async (ctx) => {
 
 bot.command("payments", async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+        await ctx.reply("❌ Siz admin emassiz");
         return;
     }
     
