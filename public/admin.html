@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Panel</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0f172a;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            margin-bottom: 20px;
+        }
+        
+        .login-box,
+        .table-box {
+            background: #111827;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        }
+        
+        input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #374151;
+            background: #1f2937;
+            color: white;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+        }
+        
+        button {
+            padding: 12px 18px;
+            border: none;
+            border-radius: 10px;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        th, td {
+            padding: 14px 10px;
+            text-align: left;
+            border-bottom: 1px solid #374151;
+        }
+        
+        th {
+            color: #93c5fd;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .paid {
+            background: #065f46;
+            color: #d1fae5;
+        }
+        
+        .unpaid {
+            background: #7f1d1d;
+            color: #fee2e2;
+        }
+        
+        .pending {
+            background: #78350f;
+            color: #fde68a;
+        }
+        
+        .pagination {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .muted {
+            color: #9ca3af;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Admin Panel</h1>
+        
+        <div id="loginBox" class="login-box">
+            <h3>Kirish</h3>
+            <input type="password" id="passwordInput" placeholder="Admin parolni kiriting" />
+            <button onclick="login()">Kirish</button>
+        </div>
+        
+        <div id="tableBox" class="table-box hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                <div>
+                    <h3 style="margin:0;">To‘lovlar ro‘yxati</h3>
+                    <div id="summary" class="muted"></div>
+                </div>
+                <button onclick="logout()">Chiqish</button>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Ism familiya</th>
+                        <th>Telefon</th>
+                        <th>To‘lov holati</th>
+                        <th>Status</th>
+                        <th>Sana</th>
+                    </tr>
+                </thead>
+                <tbody id="paymentsTableBody"></tbody>
+            </table>
+            
+            <div class="pagination">
+                <button id="prevBtn" onclick="changePage(-1)">Oldingi</button>
+                <span id="pageInfo"></span>
+                <button id="nextBtn" onclick="changePage(1)">Keyingi</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let adminPassword = localStorage.getItem("admin_panel_password") || "";
+        let currentPage = 1;
+        const limit = 10;
+        
+        function login() {
+            const value = document.getElementById("passwordInput").value.trim();
+            if (!value) {
+                alert("Parol kiriting");
+                return;
+            }
+            
+            adminPassword = value;
+            localStorage.setItem("admin_panel_password", adminPassword);
+            loadPayments();
+        }
+        
+        function logout() {
+            localStorage.removeItem("admin_panel_password");
+            adminPassword = "";
+            currentPage = 1;
+            document.getElementById("tableBox").classList.add("hidden");
+            document.getElementById("loginBox").classList.remove("hidden");
+        }
+        
+        function formatDate(dateString) {
+            if (!dateString) return "-";
+            const d = new Date(dateString);
+            return d.toLocaleString();
+        }
+        
+        function paymentBadge(paid) {
+            if (paid) {
+                return '<span class="badge paid">To‘lov qildi</span>';
+            }
+            return '<span class="badge unpaid">To‘lov qilmadi</span>';
+        }
+        
+        function statusBadge(status) {
+            if (status === "approved") {
+                return '<span class="badge paid">Tasdiqlangan</span>';
+            }
+            if (status === "rejected") {
+                return '<span class="badge unpaid">Bekor qilingan</span>';
+            }
+            return '<span class="badge pending">Kutilmoqda</span>';
+        }
+        
+        async function loadPayments() {
+            try {
+                const res = await fetch(`/admin/api/payments?page=${currentPage}&limit=${limit}`, {
+                    headers: {
+                        "x-admin-password": adminPassword
+                    }
+                });
+                
+                if (res.status === 401) {
+                    document.getElementById("tableBox").classList.add("hidden");
+                    document.getElementById("loginBox").classList.remove("hidden");
+                    alert("Parol noto‘g‘ri");
+                    return;
+                }
+                
+                const data = await res.json();
+                
+                document.getElementById("loginBox").classList.add("hidden");
+                document.getElementById("tableBox").classList.remove("hidden");
+                
+                const tbody = document.getElementById("paymentsTableBody");
+                tbody.innerHTML = "";
+                
+                data.items.forEach((item, index) => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+            <td>${(data.page - 1) * data.limit + index + 1}</td>
+            <td>${item.fullName || "-"}</td>
+            <td>${item.phone || "-"}</td>
+            <td>${paymentBadge(item.paid)}</td>
+            <td>${statusBadge(item.status)}</td>
+            <td>${formatDate(item.createdAt)}</td>
+          `;
+                    tbody.appendChild(tr);
+                });
+                
+                document.getElementById("pageInfo").textContent =
+                `Sahifa ${data.page} / ${data.totalPages}`;
+                
+                document.getElementById("summary").textContent =
+                `Jami: ${data.total} ta foydalanuvchi`;
+                
+                document.getElementById("prevBtn").disabled = data.page <= 1;
+                document.getElementById("nextBtn").disabled = data.page >= data.totalPages;
+            } catch (error) {
+                alert("Ma'lumotlarni yuklab bo‘lmadi");
+                console.error(error);
+            }
+        }
+        
+        function changePage(direction) {
+            currentPage += direction;
+            if (currentPage < 1) currentPage = 1;
+            loadPayments();
+        }
+        
+        if (adminPassword) {
+            loadPayments();
+        }
+    </script>
+</body>
+</html>

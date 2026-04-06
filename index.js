@@ -10,22 +10,18 @@ const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || "");
 const COURSE_CHAT_ID = process.env.COURSE_CHAT_ID || "";
 const CARD_NUMBER = process.env.CARD_NUMBER || "8600 0000 0000 0000";
 const VIDEO_FILE_ID_OR_URL = process.env.VIDEO_FILE_ID_OR_URL || "";
+const ADMIN_PANEL_PASSWORD = process.env.ADMIN_PANEL_PASSWORD || "12345";
 const PORT = Number(process.env.PORT || 3000);
 
-if (!BOT_TOKEN) {
-    throw new Error("BOT_TOKEN topilmadi");
-}
-
-if (!ADMIN_CHAT_ID) {
-    throw new Error("ADMIN_CHAT_ID topilmadi");
-}
+if (!BOT_TOKEN) throw new Error("BOT_TOKEN topilmadi");
+if (!ADMIN_CHAT_ID) throw new Error("ADMIN_CHAT_ID topilmadi");
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
 
-app.get("/", (req, res) => {
-    res.status(200).send("Bot ishlayapti");
-});
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use("/public", express.static(path.join(__dirname, "public")));
 
 const DATA_FILE = path.join(__dirname, "data.json");
 
@@ -68,7 +64,6 @@ function getSession(userId) {
             fullName: ""
         });
     }
-    
     return sessions.get(userId);
 }
 
@@ -92,6 +87,7 @@ function createPaymentRequest(user) {
         phone: user.phone || "",
         fullName: user.fullName || "",
         status: "pending",
+        paid: false,
         createdAt: new Date().toISOString(),
         screenshotFileId: "",
         approvedAt: null,
@@ -99,7 +95,7 @@ function createPaymentRequest(user) {
         inviteLink: ""
     };
     
-    db.payments.push(payment);
+    db.payments.unshift(payment);
     saveData(db);
     
     return payment;
@@ -111,7 +107,6 @@ function findPaymentById(id) {
 
 function updatePayment(id, patch) {
     const payment = db.payments.find((item) => item.id === id);
-    
     if (!payment) return null;
     
     Object.assign(payment, patch);
@@ -148,7 +143,6 @@ async function sendCourseVideo(ctx) {
 
 bot.start(async (ctx) => {
     const userId = String(ctx.from.id);
-    
     resetSession(userId);
     
     const session = getSession(userId);
@@ -168,12 +162,9 @@ bot.on("contact", async (ctx) => {
     const userId = String(ctx.from.id);
     const session = getSession(userId);
     
-    if (session.step !== "awaiting_phone") {
-        return;
-    }
+    if (session.step !== "awaiting_phone") return;
     
     const contact = ctx.message.contact;
-    
     if (!contact) {
         await ctx.reply("Telefon raqam yuboring.");
         return;
@@ -240,7 +231,6 @@ bot.action("join_course", async (ctx) => {
     session.step = "awaiting_screenshot";
     
     await ctx.answerCbQuery();
-    
     await ctx.reply(
         `💳 To‘lov uchun karta raqami:\n\n${CARD_NUMBER}\n\nTo‘lov qilganingizdan keyin skrinshot yuboring.`
     );
@@ -322,7 +312,7 @@ bot.action(/approve_(.+)/, async (ctx) => {
         await ctx.answerCbQuery("COURSE_CHAT_ID yozilmagan");
         await bot.telegram.sendMessage(
             ADMIN_CHAT_ID,
-            "⚠️ COURSE_CHAT_ID yozilmagan. Railway Variables ichiga yozing."
+            "⚠️ COURSE_CHAT_ID yozilmagan."
         );
         return;
     }
@@ -338,6 +328,7 @@ bot.action(/approve_(.+)/, async (ctx) => {
         
         updatePayment(paymentId, {
             status: "approved",
+            paid: true,
             approvedAt: new Date().toISOString(),
             inviteLink: invite.invite_link
         });
@@ -348,7 +339,6 @@ bot.action(/approve_(.+)/, async (ctx) => {
         );
         
         const oldCaption = ctx.callbackQuery.message.caption || "";
-        
         await ctx.editMessageCaption(`${oldCaption}\n\n✅ TASDIQLANDI`);
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.answerCbQuery("Tasdiqlandi");
@@ -374,6 +364,7 @@ bot.action(/reject_(.+)/, async (ctx) => {
     
     updatePayment(paymentId, {
         status: "rejected",
+        paid: false,
         rejectedAt: new Date().toISOString()
     });
     
@@ -383,16 +374,13 @@ bot.action(/reject_(.+)/, async (ctx) => {
     );
     
     const oldCaption = ctx.callbackQuery.message.caption || "";
-    
     await ctx.editMessageCaption(`${oldCaption}\n\n❌ BEKOR QILINDI`);
     await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
     await ctx.answerCbQuery("Bekor qilindi");
 });
 
 bot.command("admin", async (ctx) => {
-    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
-        return;
-    }
+    if (String(ctx.from.id) !== ADMIN_CHAT_ID) return;
     
     const pending = db.payments.filter((p) => p.status === "pending").length;
     const approved = db.payments.filter((p) => p.status === "approved").length;
@@ -405,6 +393,53 @@ bot.command("admin", async (ctx) => {
         `Bekor qilingan: ${rejected}\n` +
         `Jami: ${db.payments.length}`
     );
+});
+
+function checkAdminPanelAuth(req, res, next) {
+    const password = req.headers["x-admin-password"] || req.query.password;
+    
+    if (password !== ADMIN_PANEL_PASSWORD) {
+        return res.status(401).json({ error: "Parol noto‘g‘ri" });
+    }
+    
+    next();
+}
+
+app.get("/", (req, res) => {
+    res.send("Bot ishlayapti");
+});
+
+app.get("/admin", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+
+app.get("/admin/api/payments", checkAdminPanelAuth, (req, res) => {
+    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || "10", 10), 1);
+    
+    const sortedPayments = [...db.payments].sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+    
+    const total = sortedPayments.length;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const start = (page - 1) * limit;
+    const items = sortedPayments.slice(start, start + limit).map((item) => ({
+        id: item.id,
+        fullName: item.fullName || "",
+        phone: item.phone || "",
+        paid: item.paid === true,
+        status: item.status || "pending",
+        createdAt: item.createdAt || ""
+    }));
+    
+    res.json({
+        page,
+        limit,
+        total,
+        totalPages,
+        items
+    });
 });
 
 async function startBot() {
