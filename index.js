@@ -7,7 +7,7 @@ const { Telegraf, Markup } = require("telegraf");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || "");
-const COURSE_CHAT_ID = process.env.COURSE_CHAT_ID;
+const COURSE_CHAT_ID = process.env.COURSE_CHAT_ID || "";
 const CARD_NUMBER = process.env.CARD_NUMBER || "8600 0000 0000 0000";
 const VIDEO_FILE_ID_OR_URL = process.env.VIDEO_FILE_ID_OR_URL || "";
 const PORT = Number(process.env.PORT || 3000);
@@ -22,6 +22,10 @@ if (!ADMIN_CHAT_ID) {
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
+
+app.get("/", (req, res) => {
+    res.status(200).send("Bot ishlayapti");
+});
 
 const DATA_FILE = path.join(__dirname, "data.json");
 
@@ -403,22 +407,21 @@ bot.command("admin", async (ctx) => {
     );
 });
 
-app.get("/", (req, res) => {
-    res.send("Bot ishlayapti");
-});
+async function startBot() {
+    try {
+        await bot.telegram.deleteWebhook();
+        await bot.launch({
+            dropPendingUpdates: true
+        });
+        console.log("Bot ishga tushdi");
+    } catch (error) {
+        console.error("Botni ishga tushirishda xatolik:", error);
+    }
+}
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`Server ${PORT} portda ishlayapti`);
-});
-
-bot.launch({
-    dropPendingUpdates: true
-})
-.then(() => {
-    console.log("Bot ishga tushdi");
-})
-.catch((error) => {
-    console.error("Botni ishga tushirishda xatolik:", error);
+    await startBot();
 });
 
 process.on("unhandledRejection", (err) => {
