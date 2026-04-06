@@ -10,7 +10,7 @@ const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || "");
 const COURSE_CHAT_ID = process.env.COURSE_CHAT_ID;
 const CARD_NUMBER = process.env.CARD_NUMBER || "8600 0000 0000 0000";
 const VIDEO_FILE_ID_OR_URL = process.env.VIDEO_FILE_ID_OR_URL || "";
-const PORT = Number(process.env.PORT || 3001);
+const PORT = Number(process.env.PORT || 3000);
 
 if (!BOT_TOKEN) {
     throw new Error("BOT_TOKEN topilmadi");
@@ -32,14 +32,25 @@ function loadData() {
     
     try {
         const raw = fs.readFileSync(DATA_FILE, "utf8");
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        
+        if (!parsed.payments || !Array.isArray(parsed.payments)) {
+            return { payments: [] };
+        }
+        
+        return parsed;
     } catch (error) {
+        console.error("data.json o‘qishda xato:", error);
         return { payments: [] };
     }
 }
 
 function saveData(data) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
+    } catch (error) {
+        console.error("data.json yozishda xato:", error);
+    }
 }
 
 const db = loadData();
@@ -53,6 +64,7 @@ function getSession(userId) {
             fullName: ""
         });
     }
+    
     return sessions.get(userId);
 }
 
@@ -95,6 +107,7 @@ function findPaymentById(id) {
 
 function updatePayment(id, patch) {
     const payment = db.payments.find((item) => item.id === id);
+    
     if (!payment) return null;
     
     Object.assign(payment, patch);
@@ -105,7 +118,7 @@ function updatePayment(id, patch) {
 
 async function sendCourseVideo(ctx) {
     if (!VIDEO_FILE_ID_OR_URL) {
-        await ctx.reply("Video sozlanmagan. .env ichiga VIDEO_FILE_ID_OR_URL yozing.");
+        await ctx.reply("Video hozircha sozlanmagan.");
         return;
     }
     
@@ -119,10 +132,9 @@ async function sendCourseVideo(ctx) {
                 { caption: "🎥 Kurs haqida video" }
             );
         } else {
-            await ctx.replyWithVideo(
-                VIDEO_FILE_ID_OR_URL,
-                { caption: "🎥 Kurs haqida video" }
-            );
+            await ctx.replyWithVideo(VIDEO_FILE_ID_OR_URL, {
+                caption: "🎥 Kurs haqida video"
+            });
         }
     } catch (error) {
         console.error("Video yuborishda xato:", error);
@@ -268,40 +280,19 @@ bot.on("photo", async (ctx, next) => {
     `User ID: ${userId}\n` +
     `Status: Kutilmoqda`;
     
-    await bot.telegram.sendPhoto(
-        ADMIN_CHAT_ID,
-        largestPhoto.file_id,
-        {
-            caption: adminCaption,
-            ...Markup.inlineKeyboard([
-                [
-                    Markup.button.callback("✅ Tasdiqlash", `approve_${payment.id}`),
-                    Markup.button.callback("❌ Bekor qilish", `reject_${payment.id}`)
-                ]
-            ])
-        }
-    );
+    await bot.telegram.sendPhoto(ADMIN_CHAT_ID, largestPhoto.file_id, {
+        caption: adminCaption,
+        ...Markup.inlineKeyboard([
+            [
+                Markup.button.callback("✅ Tasdiqlash", `approve_${payment.id}`),
+                Markup.button.callback("❌ Bekor qilish", `reject_${payment.id}`)
+            ]
+        ])
+    });
     
     session.step = "waiting_admin";
     
     await ctx.reply("✅ Skrinshot adminga yuborildi.\n\nTasdiqlanishini kuting.");
-});
-
-bot.on("video", async (ctx, next) => {
-    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
-        return next();
-    }
-    
-    const video = ctx.message.video;
-    if (!video) {
-        return next();
-    }
-    
-    console.log("VIDEO FILE ID:", video.file_id);
-    
-    await ctx.reply(
-        `Mana video file_id:\n\n${video.file_id}\n\nShuni .env dagi VIDEO_FILE_ID_OR_URL ga yozing.`
-    );
 });
 
 bot.action(/approve_(.+)/, async (ctx) => {
@@ -327,7 +318,7 @@ bot.action(/approve_(.+)/, async (ctx) => {
         await ctx.answerCbQuery("COURSE_CHAT_ID yozilmagan");
         await bot.telegram.sendMessage(
             ADMIN_CHAT_ID,
-            "⚠️ .env ichida COURSE_CHAT_ID yozilmagan. Avval shuni to‘g‘rilang."
+            "⚠️ COURSE_CHAT_ID yozilmagan. Railway Variables ichiga yozing."
         );
         return;
     }
@@ -353,6 +344,7 @@ bot.action(/approve_(.+)/, async (ctx) => {
         );
         
         const oldCaption = ctx.callbackQuery.message.caption || "";
+        
         await ctx.editMessageCaption(`${oldCaption}\n\n✅ TASDIQLANDI`);
         await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
         await ctx.answerCbQuery("Tasdiqlandi");
@@ -387,6 +379,7 @@ bot.action(/reject_(.+)/, async (ctx) => {
     );
     
     const oldCaption = ctx.callbackQuery.message.caption || "";
+    
     await ctx.editMessageCaption(`${oldCaption}\n\n❌ BEKOR QILINDI`);
     await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
     await ctx.answerCbQuery("Bekor qilindi");
@@ -408,14 +401,6 @@ bot.command("admin", async (ctx) => {
         `Bekor qilingan: ${rejected}\n` +
         `Jami: ${db.payments.length}`
     );
-});
-
-bot.command("id", async (ctx) => {
-    await ctx.reply(`Sizning chat ID: ${ctx.chat.id}`);
-});
-
-bot.command("groupid", async (ctx) => {
-    await ctx.reply(`Bu chat ID: ${ctx.chat.id}`);
 });
 
 app.get("/", (req, res) => {

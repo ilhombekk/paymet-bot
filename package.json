@@ -1,5 +1,5 @@
 {
-    "name": "course-payment-bot",
+    "name": "payment-bot",
     "version": "1.0.0",
     "description": "Telegram course payment bot",
     "main": "index.js",
