@@ -130,6 +130,68 @@ async function getPaymentStats() {
     };
 }
 
+async function getPaymentsPage(page = 1, limit = 5) {
+    const safePage = Math.max(Number(page) || 1, 1);
+    const safeLimit = Math.max(Number(limit) || 5, 1);
+    const from = (safePage - 1) * safeLimit;
+    const to = from + safeLimit - 1;
+    
+    const { data, count, error } = await supabase
+    .from("payments")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, to);
+    
+    if (error) throw error;
+    
+    return {
+        items: data || [],
+        total: count || 0,
+        page: safePage,
+        limit: safeLimit,
+        totalPages: Math.ceil((count || 0) / safeLimit) || 1
+    };
+}
+
+function buildPaymentsText(result) {
+    if (!result.items.length) {
+        return "To‘lovlar ro‘yxati bo‘sh.";
+    }
+    
+    let text = `📋 To‘lovlar ro‘yxati\n`;
+    text += `Sahifa: ${result.page}/${result.totalPages}\n`;
+    text += `Jami: ${result.total}\n\n`;
+    
+    result.items.forEach((item, index) => {
+        const number = (result.page - 1) * result.limit + index + 1;
+        const paidText = item.paid ? "Ha" : "Yo‘q";
+        
+        text += `${number}) ${item.full_name || "-"}\n`;
+        text += `📞 ${item.phone || "-"}\n`;
+        text += `💳 To‘lov qildi: ${paidText}\n`;
+        text += `📌 Status: ${item.status || "pending"}\n`;
+        text += `🕒 ${item.created_at ? new Date(item.created_at).toLocaleString() : "-"}\n\n`;
+    });
+    
+    return text;
+}
+
+function buildPaymentsKeyboard(page, totalPages) {
+    const prevPage = page > 1 ? page - 1 : 1;
+    const nextPage = page < totalPages ? page + 1 : totalPages;
+    
+    return Markup.inlineKeyboard([
+        [
+            Markup.button.callback("⬅️ Oldingi", `payments_page_${prevPage}`),
+            Markup.button.callback(`${page}/${totalPages}`, "payments_current"),
+            Markup.button.callback("Keyingi ➡️", `payments_page_${nextPage}`)
+        ],
+        [
+            Markup.button.callback("🔄 Yangilash", `payments_page_${page}`)
+        ]
+    ]);
+}
+
 async function sendCourseVideo(ctx) {
     if (!VIDEO_FILE_ID_OR_URL) {
         await ctx.reply("Video hozircha sozlanmagan.");
@@ -423,6 +485,59 @@ bot.command("admin", async (ctx) => {
     } catch (error) {
         console.error("Admin stats xato:", error);
         await ctx.reply("Statistikani olishda xatolik bo‘ldi.");
+    }
+});
+
+bot.command("payments", async (ctx) => {
+    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+        return;
+    }
+    
+    try {
+        const result = await getPaymentsPage(1, 5);
+        const text = buildPaymentsText(result);
+        
+        await ctx.reply(
+            text,
+            buildPaymentsKeyboard(result.page, result.totalPages)
+        );
+    } catch (error) {
+        console.error("Payments command xato:", error);
+        await ctx.reply("To‘lovlar ro‘yxatini olib bo‘lmadi.");
+    }
+});
+
+bot.action("payments_current", async (ctx) => {
+    await ctx.answerCbQuery();
+});
+
+bot.action(/payments_page_(\d+)/, async (ctx) => {
+    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+        await ctx.answerCbQuery("Siz admin emassiz");
+        return;
+    }
+    
+    try {
+        const requestedPage = Number(ctx.match[1] || 1);
+        const result = await getPaymentsPage(requestedPage, 5);
+        
+        const safePage = Math.min(
+            Math.max(requestedPage, 1),
+            Math.max(result.totalPages, 1)
+        );
+        
+        const finalResult = await getPaymentsPage(safePage, 5);
+        const text = buildPaymentsText(finalResult);
+        
+        await ctx.editMessageText(
+            text,
+            buildPaymentsKeyboard(finalResult.page, finalResult.totalPages)
+        );
+        
+        await ctx.answerCbQuery();
+    } catch (error) {
+        console.error("Payments pagination xato:", error);
+        await ctx.answerCbQuery("Xatolik bo‘ldi");
     }
 });
 
