@@ -411,12 +411,22 @@ app.listen(PORT, () => {
     console.log(`Server ${PORT} portda ishlayapti`);
 });
 
-bot.launch()
+bot.launch({
+    dropPendingUpdates: true
+})
 .then(() => {
     console.log("Bot ishga tushdi");
 })
 .catch((error) => {
     console.error("Botni ishga tushirishda xatolik:", error);
+});
+
+process.on("unhandledRejection", (err) => {
+    console.error("Unhandled error:", err);
+});
+
+process.on("uncaughtException", (err) => {
+    console.error("Uncaught error:", err);
 });
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
