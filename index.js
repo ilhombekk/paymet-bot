@@ -11,6 +11,13 @@ const COURSE_CHAT_ID = process.env.COURSE_CHAT_ID || "";
 const CARD_NUMBER = process.env.CARD_NUMBER || "8600 0000 0000 0000";
 const VIDEO_FILE_ID_OR_URL = process.env.VIDEO_FILE_ID_OR_URL || "";
 const ADMIN_PANEL_PASSWORD = process.env.ADMIN_PANEL_PASSWORD || "12345";
+
+const INFO_IMAGE_1 = process.env.INFO_IMAGE_1 || "";
+const INFO_IMAGE_2 = process.env.INFO_IMAGE_2 || "";
+const INFO_IMAGE_3 = process.env.INFO_IMAGE_3 || "";
+const INFO_IMAGE_4 = process.env.INFO_IMAGE_4 || "";
+const INFO_IMAGE_5 = process.env.INFO_IMAGE_5 || "";
+
 const PORT = Number(process.env.PORT || 3000);
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -83,6 +90,10 @@ function getAdminKeyboard() {
         [Markup.button.contactRequest("📱 Telefon raqamni yuborish")],
         ["📊 Statistika", "💳 To‘lovlar"]
     ]).resize();
+}
+
+function getKeyboardByUserId(userId) {
+    return userId === ADMIN_CHAT_ID ? getAdminKeyboard() : getUserKeyboard();
 }
 
 async function createPaymentRequest(user) {
@@ -225,6 +236,41 @@ function buildPaymentsKeyboard(page, totalPages) {
     ]);
 }
 
+async function sendPhotoByIdOrUrl(ctx, value, caption = "") {
+    if (!value) return;
+    
+    if (value.startsWith("http://") || value.startsWith("https://")) {
+        await ctx.replyWithPhoto({ url: value }, caption ? { caption } : {});
+    } else {
+        await ctx.replyWithPhoto(value, caption ? { caption } : {});
+    }
+}
+
+async function sendIntroSlides(ctx) {
+    const images = [
+        INFO_IMAGE_1,
+        INFO_IMAGE_2,
+        INFO_IMAGE_3,
+        INFO_IMAGE_4,
+        INFO_IMAGE_5
+    ].filter(Boolean);
+    
+    if (!images.length) {
+        await ctx.reply(
+            "Kurs haqida rasmlar hozircha yuklanmagan. Admin INFO_IMAGE_1 dan INFO_IMAGE_5 gacha sozlashi kerak."
+        );
+        return;
+    }
+    
+    for (const image of images) {
+        await sendPhotoByIdOrUrl(ctx, image);
+    }
+    
+    await ctx.reply(
+        "💰 Kursning umumiy narxi: 1 000 000 so‘m"
+    );
+}
+
 async function sendCourseVideo(ctx) {
     if (!VIDEO_FILE_ID_OR_URL) {
         await ctx.reply("Video hozircha sozlanmagan.");
@@ -256,14 +302,29 @@ bot.start(async (ctx) => {
     resetSession(userId);
     
     const session = getSession(userId);
+    session.step = "intro";
+    
+    await sendIntroSlides(ctx);
+    
+    await ctx.reply(
+        "Yuqoridagi ma’lumotlar bilan tanishib chiqing va davom etish tugmasini bosing.",
+        Markup.inlineKeyboard([
+            [Markup.button.callback("✅ Davom etish", "continue_after_intro")]
+        ])
+    );
+});
+
+bot.action("continue_after_intro", async (ctx) => {
+    const userId = String(ctx.from.id);
+    const session = getSession(userId);
+    
     session.step = "awaiting_phone";
     
-    const keyboard =
-    userId === ADMIN_CHAT_ID ? getAdminKeyboard() : getUserKeyboard();
+    await ctx.answerCbQuery();
     
     await ctx.reply(
         "Assalomu alaykum.\n\nTelefon raqamingizni yuboring:",
-        keyboard
+        getKeyboardByUserId(userId)
     );
 });
 
