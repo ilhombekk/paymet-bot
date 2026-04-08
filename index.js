@@ -532,6 +532,86 @@ bot.on("video", async (ctx, next) => {
     }
 });
 
+bot.on("photo", async (ctx, next) => {
+    const userId = String(ctx.from.id);
+    const session = getSession(userId);
+    
+    if (session.step === "awaiting_screenshot") {
+        const photos = ctx.message.photo || [];
+        const largestPhoto = photos[photos.length - 1];
+        
+        if (!largestPhoto) {
+            await ctx.reply("Skrinshotni rasm ko‘rinishida yuboring.");
+            return;
+        }
+        
+        try {
+            const payment = await createPaymentRequest({
+                userId,
+                chatId: String(ctx.chat.id),
+                username: ctx.from.username || "",
+                firstName: ctx.from.first_name || "",
+                phone: session.phone,
+                fullName: session.fullName
+            });
+            
+            await updatePayment(payment.id, {
+                screenshot_file_id: largestPhoto.file_id
+            });
+            
+            const adminCaption =
+            `🧾 Yangi to‘lov skrinshoti\n\n` +
+            `ID: ${payment.id}\n` +
+            `Ism familiya: ${session.fullName}\n` +
+            `Telefon: ${session.phone}\n` +
+            `Username: ${ctx.from.username ? "@" + ctx.from.username : "yo‘q"}\n` +
+            `User ID: ${userId}\n` +
+            `Status: Kutilmoqda`;
+            
+            await bot.telegram.sendPhoto(ADMIN_CHAT_ID, largestPhoto.file_id, {
+                caption: adminCaption,
+                ...Markup.inlineKeyboard([
+                    [
+                        Markup.button.callback("✅ Tasdiqlash", `approve_${payment.id}`),
+                        Markup.button.callback("❌ Bekor qilish", `reject_${payment.id}`)
+                    ]
+                ])
+            });
+            
+            session.step = "waiting_admin";
+            
+            await ctx.reply("✅ Skrinshot adminga yuborildi.\n\nTasdiqlanishini kuting.");
+            return;
+        } catch (error) {
+            console.error("Photo handler xato:", error);
+            await ctx.reply("Saqlashda xatolik bo‘ldi.");
+            return;
+        }
+    }
+    
+    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+        return next();
+    }
+    
+    try {
+        const photos = ctx.message.photo || [];
+        const largestPhoto = photos[photos.length - 1];
+        
+        if (!largestPhoto) {
+            return next();
+        }
+        
+        const fileId = largestPhoto.file_id;
+        
+        await ctx.reply(
+            `🖼 Rasm file_id:\n\n${fileId}\n\nShuni Railway Variables ichidagi INFO_IMAGE ga yozing.`
+        );
+    } catch (error) {
+        console.error("Rasm file_id olishda xato:", error);
+        await ctx.reply("Rasm ID ni olib bo‘lmadi.");
+    }
+});
+
 bot.action(/approve_(.+)/, async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
         await ctx.answerCbQuery("Siz admin emassiz");
