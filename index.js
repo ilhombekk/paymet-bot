@@ -448,6 +448,29 @@ bot.on("photo", async (ctx, next) => {
     }
 });
 
+bot.on("video", async (ctx, next) => {
+    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+        return next();
+    }
+    
+    try {
+        const video = ctx.message.video;
+        
+        if (!video) {
+            return next();
+        }
+        
+        const fileId = video.file_id;
+        
+        await ctx.reply(
+            `🎥 Video file_id:\n\n${fileId}\n\nShuni Railway Variables ichidagi VIDEO_FILE_ID_OR_URL ga yozing.`
+        );
+    } catch (error) {
+        console.error("Video file_id olishda xato:", error);
+        await ctx.reply("Video ID ni olib bo‘lmadi.");
+    }
+});
+
 bot.action(/approve_(.+)/, async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
         await ctx.answerCbQuery("Siz admin emassiz");
