@@ -9,7 +9,6 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || "");
 const COURSE_CHAT_ID = process.env.COURSE_CHAT_ID || "";
 const CARD_NUMBER = process.env.CARD_NUMBER || "8600 0000 0000 0000";
-const VIDEO_FILE_ID_OR_URL = process.env.VIDEO_FILE_ID_OR_URL || "";
 const BONUS_VIDEO_FILE_ID_OR_URL = process.env.BONUS_VIDEO_FILE_ID_OR_URL || "";
 const RECORD_VIDEO_FILE_ID_OR_URL = process.env.RECORD_VIDEO_FILE_ID_OR_URL || "";
 const ADMIN_PANEL_PASSWORD = process.env.ADMIN_PANEL_PASSWORD || "12345";
@@ -19,10 +18,6 @@ const INFO_IMAGE_2 = process.env.INFO_IMAGE_2 || "";
 const INFO_IMAGE_3 = process.env.INFO_IMAGE_3 || "";
 const INFO_IMAGE_4 = process.env.INFO_IMAGE_4 || "";
 const INFO_IMAGE_5 = process.env.INFO_IMAGE_5 || "";
-
-const OFERTA_TEXT =
-process.env.OFERTA_TEXT ||
-"Men kurs shartlari, to‘lov tartibi va oferta bilan tanishdim. To‘lov qilgach, kursga qo‘shilish jarayoni boshlanishiga roziman.";
 
 const PORT = Number(process.env.PORT || 3000);
 
@@ -281,14 +276,6 @@ async function sendIntroImages(ctx) {
     }
 }
 
-async function sendBonusFlow(ctx) {
-    await sendVideoByIdOrUrl(ctx, BONUS_VIDEO_FILE_ID_OR_URL, "🎁 Bonus darslik");
-    
-    await sendIntroImages(ctx);
-    
-    await sendVideoByIdOrUrl(ctx, RECORD_VIDEO_FILE_ID_OR_URL, "🎥 Kurs bo‘yicha qo‘shimcha video");
-}
-
 bot.start(async (ctx) => {
     const userId = String(ctx.from.id);
     resetSession(userId);
@@ -414,7 +401,31 @@ bot.action("show_bonus_lesson", async (ctx) => {
     
     await ctx.answerCbQuery();
     
-    await sendBonusFlow(ctx);
+    await sendVideoByIdOrUrl(ctx, BONUS_VIDEO_FILE_ID_OR_URL, "🎁 Bonus darslik");
+    
+    await ctx.reply(
+        "Videoni ko‘rib bo‘lgach, davom etish tugmasini bosing:",
+        Markup.inlineKeyboard([
+            [Markup.button.callback("➡️ Davom etish", "show_course_materials")]
+        ])
+    );
+});
+
+bot.action("show_course_materials", async (ctx) => {
+    const userId = String(ctx.from.id);
+    const session = getSession(userId);
+    
+    if (!session.fullName || !session.phone) {
+        await ctx.answerCbQuery("Avval jarayonni boshidan o‘ting");
+        return;
+    }
+    
+    session.step = "materials_viewed";
+    
+    await ctx.answerCbQuery();
+    
+    await sendIntroImages(ctx);
+    await sendVideoByIdOrUrl(ctx, RECORD_VIDEO_FILE_ID_OR_URL, "🎥 Kurs bo‘yicha zapis video");
     
     await ctx.reply(
         "Kursga qo‘shilish uchun tugmani bosing:",
@@ -432,28 +443,6 @@ bot.action("join_course_offer", async (ctx) => {
         await ctx.answerCbQuery("Avval jarayonni boshidan o‘ting");
         return;
     }
-    
-    session.step = "awaiting_offer_accept";
-    
-    await ctx.answerCbQuery();
-    
-    await ctx.reply(
-        `📄 Oferta\n\n${OFERTA_TEXT}`,
-        Markup.inlineKeyboard([
-            [Markup.button.callback("✅ Roziman", "accept_offer")],
-            [Markup.button.callback("❌ Rozimasman", "reject_offer")]
-        ])
-    );
-});
-
-bot.action("reject_offer", async (ctx) => {
-    await ctx.answerCbQuery();
-    await ctx.reply("Jarayon to‘xtatildi. Tayyor bo‘lsangiz, /start bosing.");
-});
-
-bot.action("accept_offer", async (ctx) => {
-    const userId = String(ctx.from.id);
-    const session = getSession(userId);
     
     session.step = "awaiting_screenshot";
     
@@ -544,51 +533,26 @@ bot.on("photo", async (ctx, next) => {
     }
 });
 
-bot.on("message", async (ctx, next) => {
+bot.on("video", async (ctx, next) => {
     if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
         return next();
     }
     
     try {
-        const msg = ctx.message;
+        const video = ctx.message.video;
         
-        if (msg.video) {
-            const fileId = msg.video.file_id;
-            
-            await ctx.reply(
-                `🎥 Video file_id:\n\n${fileId}\n\n` +
-                `Bonus video bo‘lsa: BONUS_VIDEO_FILE_ID_OR_URL ga yozing.\n` +
-                `Zapis video bo‘lsa: RECORD_VIDEO_FILE_ID_OR_URL ga yozing.\n` +
-                `Asosiy kurs videosi bo‘lsa: VIDEO_FILE_ID_OR_URL ga yozing.`
-            );
-            return;
+        if (!video) {
+            return next();
         }
         
-        if (msg.video_note) {
-            const fileId = msg.video_note.file_id;
-            
-            await ctx.reply(
-                `🎥 Video note file_id:\n\n${fileId}\n\n` +
-                `Kerakli variable ga yozing.`
-            );
-            return;
-        }
+        const fileId = video.file_id;
         
-        if (msg.document && msg.document.mime_type && msg.document.mime_type.startsWith("video/")) {
-            const fileId = msg.document.file_id;
-            
-            await ctx.reply(
-                `🎥 Video document file_id:\n\n${fileId}\n\n` +
-                `Bu video document ko‘rinishida kelgan.\n` +
-                `Kerakli variable ga yozing.`
-            );
-            return;
-        }
-        
-        return next();
+        await ctx.reply(
+            `🎥 Video file_id:\n\n${fileId}\n\nBonus video uchun BONUS_VIDEO_FILE_ID_OR_URL ga, zapis video uchun RECORD_VIDEO_FILE_ID_OR_URL ga yozing.`
+        );
     } catch (error) {
-        console.error("Media file_id olishda xato:", error);
-        await ctx.reply("Media ID ni olib bo‘lmadi.");
+        console.error("Video file_id olishda xato:", error);
+        await ctx.reply("Video ID ni olib bo‘lmadi.");
     }
 });
 
