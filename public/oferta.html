@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Buxgalteriya kursi ofertasi</title>
+    <style>
+        * { box-sizing: border-box; }
+        :root {
+            --bg: #0f172a;
+            --card: #111827;
+            --card-soft: #1e293b;
+            --line: #334155;
+            --text: #f8fafc;
+            --muted: #cbd5e1;
+            --accent: #2563eb;
+            --accent-2: #1d4ed8;
+            --ok: #16a34a;
+            --warn: #f59e0b;
+            --danger: #dc2626;
+        }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(180deg, #0f172a 0%, #172554 100%);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        .wrap {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 24px 16px 48px;
+        }
+        .hero {
+            background: rgba(17, 24, 39, 0.9);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 24px;
+            padding: 28px 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.28);
+            margin-bottom: 20px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(37, 99, 235, 0.16);
+            color: #bfdbfe;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+        h1 {
+            margin: 0 0 10px;
+            font-size: 34px;
+            line-height: 1.15;
+        }
+        .subtitle {
+            color: var(--muted);
+            font-size: 17px;
+            margin: 0;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            margin: 20px 0 0;
+        }
+        .mini {
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 18px;
+            padding: 16px;
+        }
+        .mini .label {
+            color: #93c5fd;
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+        .mini .value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .card {
+            background: rgba(17, 24, 39, 0.92);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 22px;
+            padding: 22px 18px;
+            box-shadow: 0 16px 42px rgba(0,0,0,0.22);
+            margin-bottom: 16px;
+        }
+        h2 {
+            margin: 0 0 14px;
+            font-size: 22px;
+        }
+        h3 {
+            margin: 0 0 10px;
+            font-size: 18px;
+        }
+        p { margin: 0 0 12px; }
+        ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        li { margin-bottom: 8px; }
+        .split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+        .note {
+            border-left: 4px solid var(--warn);
+            background: rgba(245, 158, 11, 0.08);
+            border-radius: 14px;
+            padding: 14px;
+            color: #fde68a;
+        }
+        .danger {
+            border-left-color: var(--danger);
+            background: rgba(220, 38, 38, 0.08);
+            color: #fecaca;
+        }
+        .ok {
+            border-left-color: var(--ok);
+            background: rgba(22, 163, 74, 0.08);
+            color: #bbf7d0;
+        }
+        .footer {
+            text-align: center;
+            color: var(--muted);
+            font-size: 14px;
+            margin-top: 24px;
+        }
+        .actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 48px;
+            padding: 12px 18px;
+            border-radius: 14px;
+            text-decoration: none;
+            font-weight: 700;
+            border: 1px solid transparent;
+        }
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+        .btn-primary:hover { background: var(--accent-2); }
+        .btn-secondary {
+            border-color: rgba(255,255,255,0.15);
+            color: var(--text);
+            background: transparent;
+        }
+        @media (max-width: 760px) {
+            h1 { font-size: 28px; }
+            .grid { grid-template-columns: 1fr; }
+            .split { grid-template-columns: 1fr; }
+            .wrap { padding: 16px 12px 34px; }
+            .hero, .card { padding: 18px 14px; border-radius: 18px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <section class="hero">
+            <div class="badge">Buxgalteriya kursi ofertasi</div>
+            <h1>Buxgalteriya kursi uchun ta’lim xizmatlari ko‘rsatish shartnomasi</h1>
+            <p class="subtitle">Ushbu sahifa kursga yozilayotgan tinglovchilar uchun oferta matnining qulay, telefon uchun mos va tushunarli HTML ko‘rinishi hisoblanadi.</p>
+            
+            <div class="grid">
+                <div class="mini">
+                    <div class="label">Kurs turi</div>
+                    <div class="value">Online / Shogirdlik</div>
+                </div>
+                <div class="mini">
+                    <div class="label">To‘lov tartibi</div>
+                    <div class="value">100% oldindan</div>
+                </div>
+                <div class="mini">
+                    <div class="label">Narx</div>
+                    <div class="value">1 000 000 so‘m</div>
+                </div>
+            </div>
+        </section>
+        
+        <section class="card">
+            <h2>1. Umumiy qoidalar</h2>
+            <p>Ushbu shartnoma buxgalteriya kurslari bo‘yicha ta’lim xizmatlarini ko‘rsatuvchi bajaruvchi va kursga ro‘yxatdan o‘tgan buyurtmachi o‘rtasida tuziladi.</p>
+            <p>Buyurtmachi kursga ro‘yxatdan o‘tish orqali ushbu shartlarga to‘liq rozilik bildiradi.</p>
+        </section>
+        
+        <section class="card">
+            <h2>2. Shartnoma predmeti</h2>
+            <p>Bajaruvchi buyurtmachiga buxgalteriya bo‘yicha nazariy va amaliy bilim berish majburiyatini oladi.</p>
+            <h3>Kurs tarkibiga quyidagilar kiradi:</h3>
+            <ul>
+                <li>Jonli darslar (online yoki offline)</li>
+                <li>O‘quv materiallari</li>
+                <li>Amaliy mashg‘ulotlar</li>
+                <li>Maslahatlar</li>
+            </ul>
+            <h3 style="margin-top:14px;">Kurs shakllari:</h3>
+            <ul>
+                <li>Online kurs</li>
+                <li>Shogirdlik (offline) kurs</li>
+            </ul>
+        </section>
+        
+        <section class="card split">
+            <div>
+                <h2>3. Bajaruvchining majburiyatlari</h2>
+                <ul>
+                    <li>Darslarni jadval asosida o‘tkazish</li>
+                    <li>Sifatli ta’limni ta’minlash</li>
+                    <li>O‘quv materiallarini taqdim etish</li>
+                </ul>
+            </div>
+            <div>
+                <h2>4. Buyurtmachining majburiyatlari</h2>
+                <ul>
+                    <li>To‘lovni o‘z vaqtida amalga oshirish</li>
+                    <li>Darslarda muntazam qatnashish</li>
+                    <li>Odob-axloq qoidalariga rioya qilish</li>
+                    <li>Materiallarni boshqa shaxslarga tarqatmaslik</li>
+                </ul>
+            </div>
+        </section>
+        
+        <section class="card">
+            <h2>5. To‘lov tartibi</h2>
+            <ul>
+                <li>Buyurtmachi kurs uchun 100% oldindan to‘lov qilsa, kursning barcha darslari va materiallariga to‘liq kirish huquqiga ega bo‘ladi.</li>
+                <li>Agar to‘lov summasi to‘liq bo‘lmasa, darslar to‘langan summa miqdoriga mutanosib ravishda taqdim etiladi.</li>
+                <li>Qolgan to‘lov amalga oshirilgandan so‘ng, barcha darslarga kirish huquqi ochiladi.</li>
+            </ul>
+            <div class="note" style="margin-top:14px;">
+                Kurs narxi: <strong>1 000 000 so‘m</strong>
+            </div>
+        </section>
+        
+        <section class="card split">
+            <div>
+                <h2>6. Shogirdlik kursi</h2>
+                <ul>
+                    <li>Darsga kelinmagan kunlardagi dars kuyib ketadi va qayta o‘tilmaydi.</li>
+                    <li>Darslar o‘quvchi kelgan kundan jadval bo‘yicha davom etadi.</li>
+                    <li>Pul qaytarilmaydi.</li>
+                </ul>
+            </div>
+            <div>
+                <h2>7. Online kurs</h2>
+                <ul>
+                    <li>Darslar maxsus guruh orqali olib boriladi.</li>
+                    <li>Agar buyurtmachi 3 marta so‘ralganda javob bermasa yoki vazifalarni bajarmasa, darsdan chetlatilishi mumkin.</li>
+                    <li>Kurs tugaganidan 1 oy o‘tib, barcha darslar avtomatik tarzda olib tashlanishi mumkin.</li>
+                </ul>
+            </div>
+        </section>
+        
+        <section class="card">
+            <h2>8. Yakuniy qoidalar</h2>
+            <ul>
+                <li>Barcha nizo va kelishmovchiliklar muzokara yo‘li bilan hal qilinadi.</li>
+                <li>Kelishuvga erishilmasa, O‘zbekiston Respublikasi qonunchiligiga muvofiq sud tartibida hal qilinadi.</li>
+                <li>Agar bajaruvchi o‘z majburiyatlarini bajargan bo‘lsa, lekin buyurtmachi vazifalarni bajarmasa yoki talablarga rioya qilmasa, kurs uchun to‘langan pul qaytarilmaydi.</li>
+                <li>Shartnoma kursga ro‘yxatdan o‘tilgan paytdan kuchga kiradi va majburiyatlar to‘liq bajarilgunga qadar amal qiladi.</li>
+            </ul>
+            
+            <div class="note danger" style="margin-top:14px;">
+                Muhim: kurs uchun to‘langan pul qaytarilmaydi.
+            </div>
+            
+            <div class="note ok" style="margin-top:12px;">
+                Kursga yozilish va to‘lovni amalga oshirish orqali siz ushbu oferta shartlariga rozilik bildirgan hisoblanasiz.
+            </div>
+        </section>
+        
+        <section class="card">
+            <h2>9. Bajaruvchi ma’lumotlari</h2>
+            <p><strong>Bajaruvchi:</strong> OOO “GT CROWN BUSINESS”</p>
+            <p><strong>Direktor:</strong> Tashmukhamedova G.T.</p>
+            
+            <div class="actions">
+                <a href="#" class="btn btn-primary">✅ Roziman</a>
+                <a href="#" class="btn btn-secondary">⬅️ Orqaga</a>
+            </div>
+        </section>
+        
+        <div class="footer">
+            Ushbu HTML sahifa Word hujjatdagi oferta mazmuni asosida tayyorlandi.
+        </div>
+    </div>
+</body>
+</html>

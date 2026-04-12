@@ -9,9 +9,12 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || "");
 const COURSE_CHAT_ID = process.env.COURSE_CHAT_ID || "";
 const CARD_NUMBER = process.env.CARD_NUMBER || "8600 0000 0000 0000";
+
 const BONUS_VIDEO_FILE_ID_OR_URL = process.env.BONUS_VIDEO_FILE_ID_OR_URL || "";
 const RECORD_VIDEO_FILE_ID_OR_URL = process.env.RECORD_VIDEO_FILE_ID_OR_URL || "";
+
 const ADMIN_PANEL_PASSWORD = process.env.ADMIN_PANEL_PASSWORD || "12345";
+const OFERTA_URL = process.env.OFERTA_URL || "/oferta";
 
 const INFO_IMAGE_1 = process.env.INFO_IMAGE_1 || "";
 const INFO_IMAGE_2 = process.env.INFO_IMAGE_2 || "";
@@ -95,6 +98,14 @@ function getAdminKeyboard() {
 
 function getKeyboardByUserId(userId) {
     return userId === ADMIN_CHAT_ID ? getAdminKeyboard() : getUserPhoneKeyboard();
+}
+
+function getFullOfertaUrl(req) {
+    const base = `${req.protocol}://${req.get("host")}`;
+    if (OFERTA_URL.startsWith("http://") || OFERTA_URL.startsWith("https://")) {
+        return OFERTA_URL;
+    }
+    return `${base}${OFERTA_URL}`;
 }
 
 async function createPaymentRequest(user) {
@@ -444,6 +455,34 @@ bot.action("join_course_offer", async (ctx) => {
         return;
     }
     
+    session.step = "awaiting_offer_accept";
+    
+    await ctx.answerCbQuery();
+    
+    const host = ctx.webhookReply ? "" : "";
+    const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : null;
+    
+    const ofertaLink = OFERTA_URL.startsWith("http://") || OFERTA_URL.startsWith("https://")
+    ? OFERTA_URL
+    : baseUrl
+    ? `${baseUrl}${OFERTA_URL}`
+    : OFERTA_URL;
+    
+    await ctx.reply(
+        "📄 Kursga qo‘shilishdan oldin oferta bilan tanishing:",
+        Markup.inlineKeyboard([
+            [Markup.button.url("📄 Ofertani ko‘rish", ofertaLink)],
+            [Markup.button.callback("✅ Roziman", "accept_offer")]
+        ])
+    );
+});
+
+bot.action("accept_offer", async (ctx) => {
+    const userId = String(ctx.from.id);
+    const session = getSession(userId);
+    
     session.step = "awaiting_screenshot";
     
     await ctx.answerCbQuery();
@@ -553,6 +592,34 @@ bot.on("video", async (ctx, next) => {
     } catch (error) {
         console.error("Video file_id olishda xato:", error);
         await ctx.reply("Video ID ni olib bo‘lmadi.");
+    }
+});
+
+bot.on("message", async (ctx, next) => {
+    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+        return next();
+    }
+    
+    try {
+        const msg = ctx.message;
+        
+        if (msg.document && msg.document.mime_type?.startsWith("video/")) {
+            return ctx.reply(
+                `🎥 Video document file_id:\n\n${msg.document.file_id}\n\n` +
+                `Bonus video uchun BONUS_VIDEO_FILE_ID_OR_URL ga yoki zapis video uchun RECORD_VIDEO_FILE_ID_OR_URL ga yozing.`
+            );
+        }
+        
+        if (msg.video_note) {
+            return ctx.reply(
+                `🎥 Video note file_id:\n\n${msg.video_note.file_id}`
+            );
+        }
+        
+        return next();
+    } catch (error) {
+        console.error("Media file_id olishda xato:", error);
+        return next();
     }
 });
 
@@ -746,6 +813,10 @@ app.get("/", (req, res) => {
 
 app.get("/admin", (req, res) => {
     res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+
+app.get("/oferta", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "oferta.html"));
 });
 
 app.get("/admin/api/payments", checkAdminPanelAuth, async (req, res) => {
