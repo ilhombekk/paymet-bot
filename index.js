@@ -544,26 +544,51 @@ bot.on("photo", async (ctx, next) => {
     }
 });
 
-bot.on("video", async (ctx, next) => {
+bot.on("message", async (ctx, next) => {
     if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
         return next();
     }
     
     try {
-        const video = ctx.message.video;
+        const msg = ctx.message;
         
-        if (!video) {
-            return next();
+        if (msg.video) {
+            const fileId = msg.video.file_id;
+            
+            await ctx.reply(
+                `🎥 Video file_id:\n\n${fileId}\n\n` +
+                `Bonus video bo‘lsa: BONUS_VIDEO_FILE_ID_OR_URL ga yozing.\n` +
+                `Zapis video bo‘lsa: RECORD_VIDEO_FILE_ID_OR_URL ga yozing.\n` +
+                `Asosiy kurs videosi bo‘lsa: VIDEO_FILE_ID_OR_URL ga yozing.`
+            );
+            return;
         }
         
-        const fileId = video.file_id;
+        if (msg.video_note) {
+            const fileId = msg.video_note.file_id;
+            
+            await ctx.reply(
+                `🎥 Video note file_id:\n\n${fileId}\n\n` +
+                `Kerakli variable ga yozing.`
+            );
+            return;
+        }
         
-        await ctx.reply(
-            `🎥 Video file_id:\n\n${fileId}\n\nBonus video uchun BONUS_VIDEO_FILE_ID_OR_URL ga, zapis video uchun RECORD_VIDEO_FILE_ID_OR_URL ga yozing.`
-        );
+        if (msg.document && msg.document.mime_type && msg.document.mime_type.startsWith("video/")) {
+            const fileId = msg.document.file_id;
+            
+            await ctx.reply(
+                `🎥 Video document file_id:\n\n${fileId}\n\n` +
+                `Bu video document ko‘rinishida kelgan.\n` +
+                `Kerakli variable ga yozing.`
+            );
+            return;
+        }
+        
+        return next();
     } catch (error) {
-        console.error("Video file_id olishda xato:", error);
-        await ctx.reply("Video ID ni olib bo‘lmadi.");
+        console.error("Media file_id olishda xato:", error);
+        await ctx.reply("Media ID ni olib bo‘lmadi.");
     }
 });
 
