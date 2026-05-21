@@ -94,7 +94,7 @@ function getUserPhoneKeyboard() {
 function getAdminKeyboard() {
     return Markup.keyboard([
         [Markup.button.contactRequest("📱 Telefon raqamni yuborish")],
-        ["📊 Statistika", "💳 To‘lovlar"]
+        ["📊 Statistika", "💳 To'lovlar"]
     ]).resize();
 }
 
@@ -108,6 +108,19 @@ function getFullOfertaUrl(req) {
         return OFERTA_URL;
     }
     return `${base}${OFERTA_URL}`;
+}
+
+// Xavfsiz answerCbQuery — eskirgan callback xatosini yutadi
+async function safeAnswerCb(ctx, text) {
+    try {
+        await ctx.answerCbQuery(text);
+    } catch (e) {
+        if (e.response?.error_code === 400) {
+            // eskirgan callback — e'tiborsiz qoldiramiz
+        } else {
+            console.error("answerCbQuery xato:", e);
+        }
+    }
 }
 
 async function createPaymentRequest(user) {
@@ -213,20 +226,20 @@ function getStatusText(status) {
 
 function buildPaymentsText(result) {
     if (!result.items.length) {
-        return "To‘lovlar ro‘yxati bo‘sh.";
+        return "To'lovlar ro'yxati bo'sh.";
     }
     
-    let text = `📋 To‘lovlar ro‘yxati\n`;
+    let text = `📋 To'lovlar ro'yxati\n`;
     text += `Sahifa: ${result.page}/${result.totalPages}\n`;
     text += `Jami: ${result.total}\n\n`;
     
     result.items.forEach((item, index) => {
         const number = (result.page - 1) * result.limit + index + 1;
-        const paidText = item.paid ? "Ha" : "Yo‘q";
+        const paidText = item.paid ? "Ha" : "Yo'q";
         
         text += `${number}) ${item.full_name || "-"}\n`;
         text += `📞 ${item.phone || "-"}\n`;
-        text += `💳 To‘lov qildi: ${paidText}\n`;
+        text += `💳 To'lov qildi: ${paidText}\n`;
         text += `📌 Status: ${getStatusText(item.status)}\n`;
         text += `🕒 ${formatTashkentDate(item.created_at)}\n\n`;
     });
@@ -326,7 +339,7 @@ bot.on("contact", async (ctx) => {
     }
     
     if (String(contact.user_id || "") !== userId) {
-        await ctx.reply("Iltimos, o‘zingizning telefon raqamingizni yuboring.");
+        await ctx.reply("Iltimos, o'zingizning telefon raqamingizni yuboring.");
         return;
     }
     
@@ -334,9 +347,9 @@ bot.on("contact", async (ctx) => {
     session.step = "bonus_ready";
     
     await ctx.reply(
-        "Rahmat.\n\nEndi bonus darslikni ko‘rish tugmasini bosing:",
+        "Rahmat.\n\nEndi bonus darslikni ko'rish tugmasini bosing:",
         Markup.inlineKeyboard([
-            [Markup.button.callback("🎁 Bonus darslikni ko‘rish", "show_bonus_lesson")]
+            [Markup.button.callback("🎁 Bonus darslikni ko'rish", "show_bonus_lesson")]
         ])
     );
 });
@@ -369,12 +382,12 @@ bot.on("text", async (ctx, next) => {
             );
         } catch (error) {
             console.error("Statistika xato:", error);
-            await ctx.reply("Statistikani olishda xatolik bo‘ldi.");
+            await ctx.reply("Statistikani olishda xatolik bo'ldi.");
         }
         return;
     }
     
-    if (text === "💳 To‘lovlar") {
+    if (text === "💳 To'lovlar") {
         if (userId !== ADMIN_CHAT_ID) {
             await ctx.reply("❌ Siz admin emassiz");
             return;
@@ -389,8 +402,8 @@ bot.on("text", async (ctx, next) => {
                 buildPaymentsKeyboard(result.page, result.totalPages)
             );
         } catch (error) {
-            console.error("To‘lovlar xato:", error);
-            await ctx.reply("To‘lovlar ro‘yxatini olib bo‘lmadi.");
+            console.error("To'lovlar xato:", error);
+            await ctx.reply("To'lovlar ro'yxatini olib bo'lmadi.");
         }
         return;
     }
@@ -407,30 +420,34 @@ bot.on("text", async (ctx, next) => {
     }
     
     if (session.step === "awaiting_screenshot") {
-        await ctx.reply("Iltimos, to‘lov skrinshotini rasm qilib yuboring.");
+        await ctx.reply("Iltimos, to'lov skrinshotini rasm qilib yuboring.");
         return;
     }
     
     return next();
 });
 
+// ============================================================
+// CALLBACK HANDLERLAR — answerCbQuery DARHOL BOSHIDA chaqiriladi
+// ============================================================
+
 bot.action("show_bonus_lesson", async (ctx) => {
     const userId = String(ctx.from.id);
     const session = getSession(userId);
     
     if (!session.fullName || !session.phone) {
-        await ctx.answerCbQuery("Avval ma’lumotlarni to‘liq kiriting");
+        await safeAnswerCb(ctx, "Avval ma'lumotlarni to'liq kiriting");
         return;
     }
     
     session.step = "bonus_viewed";
     
-    await ctx.answerCbQuery();
+    await safeAnswerCb(ctx);
     
     await sendVideoByIdOrUrl(ctx, BONUS_VIDEO_FILE_ID_OR_URL, "🎁 Bonus darslik");
     
     await ctx.reply(
-        "Videoni ko‘rib bo‘lgach, davom etish tugmasini bosing:",
+        "Videoni ko'rib bo'lgach, davom etish tugmasini bosing:",
         Markup.inlineKeyboard([
             [Markup.button.callback("➡️ Davom etish", "show_course_materials")]
         ])
@@ -442,21 +459,21 @@ bot.action("show_course_materials", async (ctx) => {
     const session = getSession(userId);
     
     if (!session.fullName || !session.phone) {
-        await ctx.answerCbQuery("Avval jarayonni boshidan o‘ting");
+        await safeAnswerCb(ctx, "Avval jarayonni boshidan o'ting");
         return;
     }
     
     session.step = "materials_viewed";
     
-    await ctx.answerCbQuery();
+    await safeAnswerCb(ctx);
     
     await sendIntroImages(ctx);
-    await sendVideoByIdOrUrl(ctx, RECORD_VIDEO_FILE_ID_OR_URL, "🎥 Kurs bo‘yicha zapis video");
+    await sendVideoByIdOrUrl(ctx, RECORD_VIDEO_FILE_ID_OR_URL, "🎥 Kurs bo'yicha zapis video");
     
     await ctx.reply(
-        "Kursga qo‘shilish uchun tugmani bosing:",
+        "Kursga qo'shilish uchun tugmani bosing:",
         Markup.inlineKeyboard([
-            [Markup.button.callback("📚 Kursga qo‘shilish", "join_course_offer")]
+            [Markup.button.callback("📚 Kursga qo'shilish", "join_course_offer")]
         ])
     );
 });
@@ -466,15 +483,14 @@ bot.action("join_course_offer", async (ctx) => {
     const session = getSession(userId);
     
     if (!session.fullName || !session.phone) {
-        await ctx.answerCbQuery("Avval jarayonni boshidan o‘ting");
+        await safeAnswerCb(ctx, "Avval jarayonni boshidan o'ting");
         return;
     }
     
     session.step = "awaiting_offer_accept";
     
-    await ctx.answerCbQuery();
+    await safeAnswerCb(ctx);
     
-    const host = ctx.webhookReply ? "" : "";
     const baseUrl = process.env.BASE_URL;
     
     const ofertaLink = OFERTA_URL.startsWith("http")
@@ -482,9 +498,9 @@ bot.action("join_course_offer", async (ctx) => {
     : `${baseUrl}${OFERTA_URL}`;
     
     await ctx.reply(
-        "📄 Kursga qo‘shilishdan oldin oferta bilan tanishing:",
+        "📄 Kursga qo'shilishdan oldin oferta bilan tanishing:",
         Markup.inlineKeyboard([
-            [Markup.button.url("📄 Ofertani ko‘rish", ofertaLink)],
+            [Markup.button.url("📄 Ofertani ko'rish", ofertaLink)],
             [Markup.button.callback("✅ Roziman", "accept_offer")]
         ])
     );
@@ -496,10 +512,10 @@ bot.action("accept_offer", async (ctx) => {
     
     session.step = "awaiting_screenshot";
     
-    await ctx.answerCbQuery();
+    await safeAnswerCb(ctx);
     
     await ctx.reply(
-        `💳 To‘lov uchun karta raqami:\n\n${CARD_NUMBER}\n\nTo‘lov qilganingizdan keyin skrinshot yuboring.`
+        `💳 To'lov uchun karta raqami:\n\n${CARD_NUMBER}\n\nTo'lov qilganingizdan keyin skrinshot yuboring.`
     );
 });
 
@@ -512,7 +528,7 @@ bot.on("photo", async (ctx, next) => {
         const largestPhoto = photos[photos.length - 1];
         
         if (!largestPhoto) {
-            await ctx.reply("Skrinshotni rasm ko‘rinishida yuboring.");
+            await ctx.reply("Skrinshotni rasm ko'rinishida yuboring.");
             return;
         }
         
@@ -531,11 +547,11 @@ bot.on("photo", async (ctx, next) => {
             });
             
             const adminCaption =
-            `🧾 Yangi to‘lov skrinshoti\n\n` +
+            `🧾 Yangi to'lov skrinshoti\n\n` +
             `ID: ${payment.id}\n` +
             `Ism familiya: ${session.fullName}\n` +
             `Telefon: ${session.phone}\n` +
-            `Username: ${ctx.from.username ? "@" + ctx.from.username : "yo‘q"}\n` +
+            `Username: ${ctx.from.username ? "@" + ctx.from.username : "yo'q"}\n` +
             `User ID: ${userId}\n` +
             `Status: Kutilmoqda`;
             
@@ -555,7 +571,7 @@ bot.on("photo", async (ctx, next) => {
             return;
         } catch (error) {
             console.error("Photo handler xato:", error);
-            await ctx.reply("Saqlashda xatolik bo‘ldi.");
+            await ctx.reply("Saqlashda xatolik bo'ldi.");
             return;
         }
     }
@@ -579,7 +595,7 @@ bot.on("photo", async (ctx, next) => {
         );
     } catch (error) {
         console.error("Rasm file_id olishda xato:", error);
-        await ctx.reply("Rasm ID ni olib bo‘lmadi.");
+        await ctx.reply("Rasm ID ni olib bo'lmadi.");
     }
 });
 
@@ -602,7 +618,7 @@ bot.on("video", async (ctx, next) => {
         );
     } catch (error) {
         console.error("Video file_id olishda xato:", error);
-        await ctx.reply("Video ID ni olib bo‘lmadi.");
+        await ctx.reply("Video ID ni olib bo'lmadi.");
     }
 });
 
@@ -634,29 +650,35 @@ bot.on("message", async (ctx, next) => {
     }
 });
 
+// ============================================================
+// APPROVE / REJECT — answerCbQuery ENG BOSHIDA, keyin og'ir ishlar
+// ============================================================
+
 bot.action(/approve_(.+)/, async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
-        await ctx.answerCbQuery("Siz admin emassiz");
+        await safeAnswerCb(ctx, "Siz admin emassiz");
         return;
     }
     
     const paymentId = ctx.match[1];
     
+    // DARHOL javob — 30s timeout oldini olish
+    await safeAnswerCb(ctx, "Bajarilmoqda...");
+    
     try {
         const payment = await findPaymentById(paymentId);
         
         if (!payment) {
-            await ctx.answerCbQuery("To‘lov topilmadi");
+            await bot.telegram.sendMessage(ADMIN_CHAT_ID, "⚠️ To'lov topilmadi");
             return;
         }
         
         if (payment.status === "approved") {
-            await ctx.answerCbQuery("Bu to‘lov avval tasdiqlangan");
+            await bot.telegram.sendMessage(ADMIN_CHAT_ID, "ℹ️ Bu to'lov avval tasdiqlangan");
             return;
         }
         
         if (!COURSE_CHAT_ID) {
-            await ctx.answerCbQuery("COURSE_CHAT_ID yozilmagan");
             await bot.telegram.sendMessage(
                 ADMIN_CHAT_ID,
                 "⚠️ COURSE_CHAT_ID yozilmagan."
@@ -676,10 +698,9 @@ bot.action(/approve_(.+)/, async (ctx) => {
             inviteLink = invite.invite_link;
         } catch (error) {
             console.error('Create invite link xato:', error);
-            await ctx.answerCbQuery("Kurs havolasi yaratilmayapti");
             await bot.telegram.sendMessage(
                 ADMIN_CHAT_ID,
-                "⚠️ Taklif havolasi yaratilmayapti. Iltimos, botni COURSE_CHAT_ID guruhi yoki kanalingizga admin qiling va COURSE_CHAT_ID to‘g‘ri ekanini tekshiring."
+                "⚠️ Taklif havolasi yaratilmayapti. Iltimos, botni COURSE_CHAT_ID guruhi yoki kanalingizga admin qiling va COURSE_CHAT_ID to'g'ri ekanini tekshiring."
             );
             return;
         }
@@ -694,7 +715,7 @@ bot.action(/approve_(.+)/, async (ctx) => {
         try {
             await bot.telegram.sendMessage(
                 payment.chat_id,
-                `✅ To‘lovingiz tasdiqlandi.\n\nKursga kirish havolasi:\n${inviteLink}`
+                `✅ To'lovingiz tasdiqlandi.\n\nKursga kirish havolasi:\n${inviteLink}`
             );
         } catch (notifyError) {
             console.error('Foydalanuvchiga xabar yuborishda xato:', notifyError);
@@ -703,9 +724,11 @@ bot.action(/approve_(.+)/, async (ctx) => {
                 `⚠️ Foydalanuvchiga xabar yuborilmadi: ${notifyError.message || notifyError}`
             );
         }
-
+        
         const oldCaption = ctx.callbackQuery.message.caption || "";
-        await ctx.editMessageCaption(`${oldCaption}\n\n✅ TASDIQLANDI`);
+        try {
+            await ctx.editMessageCaption(`${oldCaption}\n\n✅ TASDIQLANDI`);
+        } catch (_) {}
         if (ctx.callbackQuery.message.reply_markup?.inline_keyboard?.length) {
             try {
                 await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
@@ -716,26 +739,28 @@ bot.action(/approve_(.+)/, async (ctx) => {
                 }
             }
         }
-        await ctx.answerCbQuery("Tasdiqlandi");
     } catch (error) {
         console.error("Approve xato:", error);
-        await ctx.answerCbQuery("Xatolik bo‘ldi");
+        await bot.telegram.sendMessage(ADMIN_CHAT_ID, "⚠️ Tasdiqlashda xatolik bo'ldi");
     }
 });
 
 bot.action(/reject_(.+)/, async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
-        await ctx.answerCbQuery("Siz admin emassiz");
+        await safeAnswerCb(ctx, "Siz admin emassiz");
         return;
     }
     
     const paymentId = ctx.match[1];
     
+    // DARHOL javob — 30s timeout oldini olish
+    await safeAnswerCb(ctx, "Bajarilmoqda...");
+    
     try {
         const payment = await findPaymentById(paymentId);
         
         if (!payment) {
-            await ctx.answerCbQuery("To‘lov topilmadi");
+            await bot.telegram.sendMessage(ADMIN_CHAT_ID, "⚠️ To'lov topilmadi");
             return;
         }
         
@@ -745,13 +770,19 @@ bot.action(/reject_(.+)/, async (ctx) => {
             rejected_at: new Date().toISOString()
         });
         
-        await bot.telegram.sendMessage(
-            payment.chat_id,
-            "❌ To‘lov tasdiqlanmadi.\n\nIltimos, qayta tekshirib yuboring."
-        );
+        try {
+            await bot.telegram.sendMessage(
+                payment.chat_id,
+                "❌ To'lov tasdiqlanmadi.\n\nIltimos, qayta tekshirib yuboring."
+            );
+        } catch (notifyError) {
+            console.error('Foydalanuvchiga xabar yuborishda xato:', notifyError);
+        }
         
         const oldCaption = ctx.callbackQuery.message.caption || "";
-        await ctx.editMessageCaption(`${oldCaption}\n\n❌ BEKOR QILINDI`);
+        try {
+            await ctx.editMessageCaption(`${oldCaption}\n\n❌ BEKOR QILINDI`);
+        } catch (_) {}
         if (ctx.callbackQuery.message.reply_markup?.inline_keyboard?.length) {
             try {
                 await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
@@ -762,10 +793,9 @@ bot.action(/reject_(.+)/, async (ctx) => {
                 }
             }
         }
-        await ctx.answerCbQuery("Bekor qilindi");
     } catch (error) {
         console.error("Reject xato:", error);
-        await ctx.answerCbQuery("Xatolik bo‘ldi");
+        await bot.telegram.sendMessage(ADMIN_CHAT_ID, "⚠️ Bekor qilishda xatolik bo'ldi");
     }
 });
 
@@ -788,7 +818,7 @@ bot.command("admin", async (ctx) => {
         );
     } catch (error) {
         console.error("Admin stats xato:", error);
-        await ctx.reply("Statistikani olishda xatolik bo‘ldi.");
+        await ctx.reply("Statistikani olishda xatolik bo'ldi.");
     }
 });
 
@@ -808,19 +838,22 @@ bot.command("payments", async (ctx) => {
         );
     } catch (error) {
         console.error("Payments command xato:", error);
-        await ctx.reply("To‘lovlar ro‘yxatini olib bo‘lmadi.");
+        await ctx.reply("To'lovlar ro'yxatini olib bo'lmadi.");
     }
 });
 
 bot.action("payments_current", async (ctx) => {
-    await ctx.answerCbQuery();
+    await safeAnswerCb(ctx);
 });
 
 bot.action(/payments_page_(\d+)/, async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
-        await ctx.answerCbQuery("Siz admin emassiz");
+        await safeAnswerCb(ctx, "Siz admin emassiz");
         return;
     }
+    
+    // DARHOL javob
+    await safeAnswerCb(ctx);
     
     try {
         const requestedPage = Number(ctx.match[1] || 1);
@@ -838,11 +871,8 @@ bot.action(/payments_page_(\d+)/, async (ctx) => {
             text,
             buildPaymentsKeyboard(finalResult.page, finalResult.totalPages)
         );
-        
-        await ctx.answerCbQuery();
     } catch (error) {
         console.error("Payments pagination xato:", error);
-        await ctx.answerCbQuery("Xatolik bo‘ldi");
     }
 });
 
@@ -850,7 +880,7 @@ function checkAdminPanelAuth(req, res, next) {
     const password = req.headers["x-admin-password"] || req.query.password;
     
     if (password !== ADMIN_PANEL_PASSWORD) {
-        return res.status(401).json({ error: "Parol noto‘g‘ri" });
+        return res.status(401).json({ error: "Parol noto'g'ri" });
     }
     
     next();
