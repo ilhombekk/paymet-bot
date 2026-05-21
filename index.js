@@ -10,8 +10,10 @@ const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || "");
 const COURSE_CHAT_ID = process.env.COURSE_CHAT_ID || "";
 const CARD_NUMBER = process.env.CARD_NUMBER || "8600 0000 0000 0000";
 
-const BONUS_VIDEO_FILE_ID_OR_URL = process.env.BONUS_VIDEO_FILE_ID_OR_URL || "";
-const RECORD_VIDEO_FILE_ID_OR_URL = process.env.RECORD_VIDEO_FILE_ID_OR_URL || "";
+const VIDEO_FILE_ID_OR_URL = process.env.VIDEO_FILE_ID_OR_URL || "";
+const BONUS_VIDEO_FILE_ID_OR_URL = process.env.BONUS_VIDEO_FILE_ID_OR_URL || VIDEO_FILE_ID_OR_URL || "";
+const RECORD_VIDEO_FILE_ID_OR_URL = process.env.RECORD_VIDEO_FILE_ID_OR_URL || VIDEO_FILE_ID_OR_URL || "";
+const IMAGE_FILE_ID_OR_URL = process.env.IMAGE_FILE_ID_OR_URL || "";
 
 const ADMIN_PANEL_PASSWORD = process.env.ADMIN_PANEL_PASSWORD || "12345";
 const OFERTA_URL = process.env.OFERTA_URL || "/oferta";
@@ -251,20 +253,28 @@ function buildPaymentsKeyboard(page, totalPages) {
 async function sendPhotoByIdOrUrl(ctx, value, caption = "") {
     if (!value) return;
     
-    if (value.startsWith("http://") || value.startsWith("https://")) {
-        await ctx.replyWithPhoto({ url: value }, caption ? { caption } : {});
-    } else {
-        await ctx.replyWithPhoto(value, caption ? { caption } : {});
+    try {
+        if (value.startsWith("http://") || value.startsWith("https://")) {
+            await ctx.replyWithPhoto({ url: value }, caption ? { caption } : {});
+        } else {
+            await ctx.replyWithPhoto(value, caption ? { caption } : {});
+        }
+    } catch (error) {
+        console.error('sendPhotoByIdOrUrl xato:', error);
     }
 }
 
 async function sendVideoByIdOrUrl(ctx, value, caption = "") {
     if (!value) return;
     
-    if (value.startsWith("http://") || value.startsWith("https://")) {
-        await ctx.replyWithVideo({ url: value }, caption ? { caption } : {});
-    } else {
-        await ctx.replyWithVideo(value, caption ? { caption } : {});
+    try {
+        if (value.startsWith("http://") || value.startsWith("https://")) {
+            await ctx.replyWithVideo({ url: value }, caption ? { caption } : {});
+        } else {
+            await ctx.replyWithVideo(value, caption ? { caption } : {});
+        }
+    } catch (error) {
+        console.error('sendVideoByIdOrUrl xato:', error);
     }
 }
 
@@ -276,6 +286,11 @@ async function sendIntroImages(ctx) {
         INFO_IMAGE_4,
         INFO_IMAGE_5
     ].filter(Boolean);
+    
+    if (!images.length && IMAGE_FILE_ID_OR_URL) {
+        await sendPhotoByIdOrUrl(ctx, IMAGE_FILE_ID_OR_URL);
+        return;
+    }
     
     if (!images.length) {
         await ctx.reply("Kurs rasmlari hozircha yuklanmagan.");
@@ -651,27 +666,56 @@ bot.action(/approve_(.+)/, async (ctx) => {
         
         const expireDate = Math.floor(Date.now() / 1000) + 60 * 60 * 24;
         
-        const invite = await bot.telegram.createChatInviteLink(COURSE_CHAT_ID, {
-            name: `course_${payment.user_id}_${payment.id}`,
-            member_limit: 1,
-            expire_date: expireDate
-        });
+        let inviteLink;
+        try {
+            const invite = await bot.telegram.createChatInviteLink(COURSE_CHAT_ID, {
+                name: `course_${payment.user_id}_${payment.id}`,
+                member_limit: 1,
+                expire_date: expireDate
+            });
+            inviteLink = invite.invite_link;
+        } catch (error) {
+            console.error('Create invite link xato:', error);
+            await ctx.answerCbQuery("Kurs havolasi yaratilmayapti");
+            await bot.telegram.sendMessage(
+                ADMIN_CHAT_ID,
+                "⚠️ Taklif havolasi yaratilmayapti. Iltimos, botni COURSE_CHAT_ID guruhi yoki kanalingizga admin qiling va COURSE_CHAT_ID to‘g‘ri ekanini tekshiring."
+            );
+            return;
+        }
         
         await updatePayment(paymentId, {
             status: "approved",
             paid: true,
             approved_at: new Date().toISOString(),
-            invite_link: invite.invite_link
+            invite_link: inviteLink
         });
         
-        await bot.telegram.sendMessage(
-            payment.chat_id,
-            `✅ To‘lovingiz tasdiqlandi.\n\nKursga kirish havolasi:\n${invite.invite_link}`
-        );
-        
+        try {
+            await bot.telegram.sendMessage(
+                payment.chat_id,
+                `✅ To‘lovingiz tasdiqlandi.\n\nKursga kirish havolasi:\n${inviteLink}`
+            );
+        } catch (notifyError) {
+            console.error('Foydalanuvchiga xabar yuborishda xato:', notifyError);
+            await bot.telegram.sendMessage(
+                ADMIN_CHAT_ID,
+                `⚠️ Foydalanuvchiga xabar yuborilmadi: ${notifyError.message || notifyError}`
+            );
+        }
+
         const oldCaption = ctx.callbackQuery.message.caption || "";
         await ctx.editMessageCaption(`${oldCaption}\n\n✅ TASDIQLANDI`);
-        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+        if (ctx.callbackQuery.message.reply_markup?.inline_keyboard?.length) {
+            try {
+                await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+            } catch (error) {
+                const description = error.description || error?.response?.description || error?.message || "";
+                if (!description.includes('message is not modified')) {
+                    console.error('Approve reply markup xato:', error);
+                }
+            }
+        }
         await ctx.answerCbQuery("Tasdiqlandi");
     } catch (error) {
         console.error("Approve xato:", error);
@@ -708,7 +752,16 @@ bot.action(/reject_(.+)/, async (ctx) => {
         
         const oldCaption = ctx.callbackQuery.message.caption || "";
         await ctx.editMessageCaption(`${oldCaption}\n\n❌ BEKOR QILINDI`);
-        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+        if (ctx.callbackQuery.message.reply_markup?.inline_keyboard?.length) {
+            try {
+                await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+            } catch (error) {
+                const description = error.description || error?.response?.description || error?.message || "";
+                if (!description.includes('message is not modified')) {
+                    console.error('Reject reply markup xato:', error);
+                }
+            }
+        }
         await ctx.answerCbQuery("Bekor qilindi");
     } catch (error) {
         console.error("Reject xato:", error);
