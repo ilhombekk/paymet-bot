@@ -460,15 +460,11 @@ bot.action("join_course_offer", async (ctx) => {
     await ctx.answerCbQuery();
     
     const host = ctx.webhookReply ? "" : "";
-    const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN
-    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-    : null;
+    const baseUrl = process.env.BASE_URL;
     
-    const ofertaLink = OFERTA_URL.startsWith("http://") || OFERTA_URL.startsWith("https://")
+    const ofertaLink = OFERTA_URL.startsWith("http")
     ? OFERTA_URL
-    : baseUrl
-    ? `${baseUrl}${OFERTA_URL}`
-    : OFERTA_URL;
+    : `${baseUrl}${OFERTA_URL}`;
     
     await ctx.reply(
         "📄 Kursga qo‘shilishdan oldin oferta bilan tanishing:",
