@@ -157,6 +157,21 @@
             color: var(--text);
             background: transparent;
         }
+        .price-row {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .old-price {
+            color: var(--muted);
+            text-decoration: line-through;
+            text-decoration-thickness: 2px;
+        }
+        .new-price {
+            color: var(--text);
+            font-weight: 800;
+        }
         @media (max-width: 760px) {
             h1 { font-size: 28px; }
             .grid { grid-template-columns: 1fr; }
@@ -183,7 +198,10 @@
                 </div>
                 <div class="mini">
                     <div class="label">Narx</div>
-                    <div class="value">1 000 000 so‘m</div>
+                    <div class="value price-row">
+                        <span class="old-price">2 000 000</span>
+                        <span class="new-price">1 500 000 so'm</span>
+                    </div>
                 </div>
             </div>
         </section>
@@ -239,7 +257,11 @@
                 <li>Qolgan to‘lov amalga oshirilgandan so‘ng, barcha darslarga kirish huquqi ochiladi.</li>
             </ul>
             <div class="note" style="margin-top:14px;">
-                Kurs narxi: <strong>1 000 000 so‘m</strong>
+                Kurs narxi:
+                <strong class="price-row">
+                    <span class="old-price">2 000 000</span>
+                    <span class="new-price">1 500 000 so'm</span>
+                </strong>
             </div>
         </section>
         
