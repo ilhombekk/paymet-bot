@@ -1,16 +1,16 @@
 {
     "name": "payment-bot",
     "version": "1.0.0",
-    "description": "Telegram course payment bot with Supabase admin panel",
+    "description": "Telegram course payment bot with MongoDB admin panel",
     "main": "index.js",
     "type": "commonjs",
     "scripts": {
         "start": "node index.js"
     },
     "dependencies": {
-        "@supabase/supabase-js": "^2.49.4",
         "dotenv": "^16.4.5",
         "express": "^4.21.2",
+        "mongoose": "^9.9.3",
         "telegraf": "^4.16.3"
     }
 }

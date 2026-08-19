@@ -3,12 +3,12 @@ require("dotenv").config();
 const path = require("path");
 const express = require("express");
 const { Telegraf, Markup } = require("telegraf");
-const { createClient } = require("@supabase/supabase-js");
+const mongoose = require("mongoose");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || "");
 const COURSE_CHAT_ID = process.env.COURSE_CHAT_ID || "";
-const CARD_NUMBER = process.env.CARD_NUMBER || "8600 0000 0000 0000";
+const CARD_NUMBER = process.env.CARD_NUMBER || "9860 1701 0393 3454";
 
 const BONUS_VIDEO_FILE_ID_OR_URL = process.env.BONUS_VIDEO_FILE_ID_OR_URL || "";
 const RECORD_VIDEO_FILE_ID_OR_URL = process.env.RECORD_VIDEO_FILE_ID_OR_URL || "";
@@ -24,22 +24,11 @@ const INFO_IMAGE_5 = process.env.INFO_IMAGE_5 || "";
 
 const PORT = Number(process.env.PORT || 3000);
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
 
 if (!BOT_TOKEN) throw new Error("BOT_TOKEN topilmadi");
 if (!ADMIN_CHAT_ID) throw new Error("ADMIN_CHAT_ID topilmadi");
-if (!SUPABASE_URL) throw new Error("SUPABASE_URL topilmadi");
-if (!SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error("SUPABASE_SERVICE_ROLE_KEY topilmadi");
-}
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: {
-        autoRefreshToken: false,
-        persistSession: false
-    }
-});
+if (!MONGO_URI) throw new Error("MONGO_URI topilmadi");
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
@@ -49,6 +38,40 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/public", express.static(path.join(__dirname, "public")));
 
 const sessions = new Map();
+
+const paymentSchema = new mongoose.Schema(
+    {
+        id: { type: String, required: true, unique: true, index: true },
+        user_id: { type: String, default: "" },
+        chat_id: { type: String, default: "" },
+        username: { type: String, default: "" },
+        first_name: { type: String, default: "" },
+        phone: { type: String, default: "" },
+        full_name: { type: String, default: "" },
+        status: {
+            type: String,
+            enum: ["pending", "approved", "rejected"],
+            default: "pending",
+            index: true
+        },
+        paid: { type: Boolean, default: false },
+        screenshot_file_id: { type: String, default: "" },
+        invite_link: { type: String, default: "" },
+        created_at: { type: Date, default: Date.now, index: true },
+        approved_at: { type: Date, default: null },
+        rejected_at: { type: Date, default: null }
+    },
+    {
+        versionKey: false
+    }
+);
+
+const Payment = mongoose.model("Payment", paymentSchema);
+
+async function connectMongo() {
+    await mongoose.connect(MONGO_URI);
+    console.log("MongoDB ulandi");
+}
 
 function getSession(userId) {
     if (!sessions.has(userId)) {
@@ -125,58 +148,35 @@ async function createPaymentRequest(user) {
         invite_link: ""
     };
     
-    const { data, error } = await supabase
-    .from("payments")
-    .insert(payload)
-    .select()
-    .single();
-    
-    if (error) throw error;
-    
-    return data;
+    const payment = await Payment.create(payload);
+    return payment.toObject();
 }
 
 async function findPaymentById(id) {
-    const { data, error } = await supabase
-    .from("payments")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-    
-    if (error) throw error;
-    
-    return data;
+    return Payment.findOne({ id }).lean();
 }
 
 async function updatePayment(id, patch) {
-    const { data, error } = await supabase
-    .from("payments")
-    .update(patch)
-    .eq("id", id)
-    .select()
-    .single();
-    
-    if (error) throw error;
-    
-    return data;
+    return Payment.findOneAndUpdate(
+        { id },
+        { $set: patch },
+        { new: true, runValidators: true }
+    ).lean();
 }
 
 async function getPaymentStats() {
-    const { data, error } = await supabase
-    .from("payments")
-    .select("status");
-    
-    if (error) throw error;
-    
-    const pending = data.filter((item) => item.status === "pending").length;
-    const approved = data.filter((item) => item.status === "approved").length;
-    const rejected = data.filter((item) => item.status === "rejected").length;
+    const [pending, approved, rejected, total] = await Promise.all([
+        Payment.countDocuments({ status: "pending" }),
+        Payment.countDocuments({ status: "approved" }),
+        Payment.countDocuments({ status: "rejected" }),
+        Payment.countDocuments({})
+    ]);
     
     return {
         pending,
         approved,
         rejected,
-        total: data.length
+        total
     };
 }
 
@@ -186,13 +186,14 @@ async function getPaymentsPage(page = 1, limit = 5) {
     const from = (safePage - 1) * safeLimit;
     const to = from + safeLimit - 1;
     
-    const { data, count, error } = await supabase
-    .from("payments")
-    .select("*", { count: "exact" })
-    .order("created_at", { ascending: false })
-    .range(from, to);
-    
-    if (error) throw error;
+    const [data, count] = await Promise.all([
+        Payment.find({})
+        .sort({ created_at: -1 })
+        .skip(from)
+        .limit(safeLimit)
+        .lean(),
+        Payment.countDocuments({})
+    ]);
     
     return {
         items: data || [],
@@ -819,15 +820,15 @@ app.get("/admin/api/payments", checkAdminPanelAuth, async (req, res) => {
         const page = Math.max(parseInt(req.query.page || "1", 10), 1);
         const limit = Math.max(parseInt(req.query.limit || "10", 10), 1);
         const from = (page - 1) * limit;
-        const to = from + limit - 1;
         
-        const { data, count, error } = await supabase
-        .from("payments")
-        .select("*", { count: "exact" })
-        .order("created_at", { ascending: false })
-        .range(from, to);
-        
-        if (error) throw error;
+        const [data, count] = await Promise.all([
+            Payment.find({})
+            .sort({ created_at: -1 })
+            .skip(from)
+            .limit(limit)
+            .lean(),
+            Payment.countDocuments({})
+        ]);
         
         const total = count || 0;
         const totalPages = Math.ceil(total / limit) || 1;
@@ -868,7 +869,13 @@ async function startBot() {
 
 app.listen(PORT, async () => {
     console.log(`Server ${PORT} portda ishlayapti`);
-    await startBot();
+    try {
+        await connectMongo();
+        await startBot();
+    } catch (error) {
+        console.error("Serverni ishga tushirishda xatolik:", error);
+        process.exit(1);
+    }
 });
 
 process.on("unhandledRejection", (err) => {
