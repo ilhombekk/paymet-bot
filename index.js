@@ -160,7 +160,7 @@ async function updatePayment(id, patch) {
     return Payment.findOneAndUpdate(
         { id },
         { $set: patch },
-        { new: true, runValidators: true }
+        { returnDocument: "after", runValidators: true }
     ).lean();
 }
 
@@ -264,6 +264,8 @@ async function sendVideoByIdOrUrl(ctx, value, caption = "") {
     
     if (value.startsWith("http://") || value.startsWith("https://")) {
         await ctx.replyWithVideo({ url: value }, caption ? { caption } : {});
+    } else if (value.startsWith("DQAC")) {
+        await ctx.replyWithDocument(value, caption ? { caption } : {});
     } else {
         await ctx.replyWithVideo(value, caption ? { caption } : {});
     }
