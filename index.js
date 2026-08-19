@@ -332,8 +332,10 @@ bot.on("contact", async (ctx) => {
     session.phone = contact.phone_number;
     session.step = "bonus_ready";
     
+    await ctx.reply("Rahmat.", Markup.removeKeyboard());
+    
     await ctx.reply(
-        "Rahmat.\n\nEndi bonus darslikni ko‘rish tugmasini bosing:",
+        "Endi bonus darslikni ko‘rish tugmasini bosing:",
         Markup.inlineKeyboard([
             [Markup.button.callback("🎁 Bonus darslikni ko‘rish", "show_bonus_lesson")]
         ])
