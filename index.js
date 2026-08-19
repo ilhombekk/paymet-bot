@@ -260,14 +260,25 @@ async function sendPhotoByIdOrUrl(ctx, value, caption = "") {
 }
 
 async function sendVideoByIdOrUrl(ctx, value, caption = "") {
-    if (!value) return;
+    if (!value) return false;
     
-    if (value.startsWith("http://") || value.startsWith("https://")) {
-        await ctx.replyWithVideo({ url: value }, caption ? { caption } : {});
-    } else if (value.startsWith("DQAC")) {
-        await ctx.replyWithDocument(value, caption ? { caption } : {});
-    } else {
-        await ctx.replyWithVideo(value, caption ? { caption } : {});
+    try {
+        if (value.startsWith("http://") || value.startsWith("https://")) {
+            await ctx.replyWithVideo({ url: value }, caption ? { caption } : {});
+        } else if (value.startsWith("DQAC")) {
+            await ctx.replyWithDocument(value, caption ? { caption } : {});
+        } else {
+            await ctx.replyWithVideo(value, caption ? { caption } : {});
+        }
+        return true;
+    } catch (error) {
+        console.error("Video yuborishda xato:", {
+            message: error.message,
+            description: error.response?.description,
+            method: error.on?.method
+        });
+        await ctx.reply("Video yuborishda xatolik bo‘ldi. Jarayonni davom ettirishingiz mumkin.");
+        return false;
     }
 }
 
