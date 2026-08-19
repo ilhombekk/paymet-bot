@@ -453,6 +453,9 @@ bot.action("show_course_materials", async (ctx) => {
     await sendVideoByIdOrUrl(ctx, RECORD_VIDEO_FILE_ID_OR_URL, "🎥 Kurs bo‘yicha zapis video");
     
     await ctx.reply(
+        "Buxgalteriya onlayn kurs narxi 2mln so'm.\n" +
+        "10 kun ichida to'lov qilgan o'quvchiga chegirmada 1,5mln so'm.\n\n" +
+        "Shoshiling, joylar soni atigi 10ta.\n\n" +
         "Kursga qo‘shilish uchun tugmani bosing:",
         Markup.inlineKeyboard([
             [Markup.button.callback("📚 Kursga qo‘shilish", "join_course_offer")]
