@@ -7,6 +7,12 @@ const mongoose = require("mongoose");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || "");
+const ADMIN_CHAT_IDS = [...new Set([
+    ADMIN_CHAT_ID,
+    ...String(process.env.ADMIN_CHAT_IDS || "")
+    .split(",")
+    .map((id) => id.trim())
+].filter(Boolean))];
 const COURSE_CHAT_ID = process.env.COURSE_CHAT_ID || "";
 const CARD_NUMBER = process.env.CARD_NUMBER || "9860 1701 0393 3454";
 
@@ -27,7 +33,7 @@ const PORT = Number(process.env.PORT || 3000);
 const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
 
 if (!BOT_TOKEN) throw new Error("BOT_TOKEN topilmadi");
-if (!ADMIN_CHAT_ID) throw new Error("ADMIN_CHAT_ID topilmadi");
+if (!ADMIN_CHAT_IDS.length) throw new Error("ADMIN_CHAT_ID topilmadi");
 if (!MONGO_URI) throw new Error("MONGO_URI topilmadi");
 
 const bot = new Telegraf(BOT_TOKEN);
@@ -119,8 +125,25 @@ function getAdminKeyboard() {
     ]).resize();
 }
 
+function isAdmin(userId) {
+    return ADMIN_CHAT_IDS.includes(String(userId));
+}
+
 function getKeyboardByUserId(userId) {
-    return userId === ADMIN_CHAT_ID ? getAdminKeyboard() : getUserPhoneKeyboard();
+    return isAdmin(userId) ? getAdminKeyboard() : getUserPhoneKeyboard();
+}
+
+async function sendPhotoToAdmins(fileId, extra) {
+    await Promise.all(
+        ADMIN_CHAT_IDS.map((adminId) =>
+            bot.telegram.sendPhoto(adminId, fileId, extra).catch((error) => {
+                console.error("Adminga rasm yuborishda xato:", {
+                    adminId,
+                    message: error.message
+                });
+            })
+        )
+    );
 }
 
 function getFullOfertaUrl(req) {
@@ -352,7 +375,7 @@ bot.on("text", async (ctx, next) => {
     }
     
     if (text === "📊 Statistika") {
-        if (userId !== ADMIN_CHAT_ID) {
+        if (!isAdmin(userId)) {
             await ctx.reply("❌ Siz admin emassiz");
             return;
         }
@@ -376,7 +399,7 @@ bot.on("text", async (ctx, next) => {
     }
     
     if (text === "💳 To‘lovlar") {
-        if (userId !== ADMIN_CHAT_ID) {
+        if (!isAdmin(userId)) {
             await ctx.reply("❌ Siz admin emassiz");
             return;
         }
@@ -543,7 +566,7 @@ bot.on("photo", async (ctx, next) => {
             `User ID: ${userId}\n` +
             `Status: Kutilmoqda`;
             
-            await bot.telegram.sendPhoto(ADMIN_CHAT_ID, largestPhoto.file_id, {
+            await sendPhotoToAdmins(largestPhoto.file_id, {
                 caption: adminCaption,
                 ...Markup.inlineKeyboard([
                     [
@@ -564,7 +587,7 @@ bot.on("photo", async (ctx, next) => {
         }
     }
     
-    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+    if (!isAdmin(ctx.from.id)) {
         return next();
     }
     
@@ -588,7 +611,7 @@ bot.on("photo", async (ctx, next) => {
 });
 
 bot.on("video", async (ctx, next) => {
-    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+    if (!isAdmin(ctx.from.id)) {
         return next();
     }
     
@@ -611,7 +634,7 @@ bot.on("video", async (ctx, next) => {
 });
 
 bot.on("message", async (ctx, next) => {
-    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+    if (!isAdmin(ctx.from.id)) {
         return next();
     }
     
@@ -639,7 +662,7 @@ bot.on("message", async (ctx, next) => {
 });
 
 bot.action(/approve_(.+)/, async (ctx) => {
-    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+    if (!isAdmin(ctx.from.id)) {
         try { await ctx.answerCbQuery("Siz admin emassiz"); } catch (_) {}
         return;
     }
@@ -650,15 +673,15 @@ bot.action(/approve_(.+)/, async (ctx) => {
     try {
         const payment = await findPaymentById(paymentId);
         if (!payment) {
-            await bot.telegram.sendMessage(ADMIN_CHAT_ID, "To'lov topilmadi");
+            await bot.telegram.sendMessage(ctx.from.id, "To'lov topilmadi");
             return;
         }
         if (payment.status === "approved") {
-            await bot.telegram.sendMessage(ADMIN_CHAT_ID, "Bu to'lov avval tasdiqlangan");
+            await bot.telegram.sendMessage(ctx.from.id, "Bu to'lov avval tasdiqlangan");
             return;
         }
         if (!COURSE_CHAT_ID) {
-            await bot.telegram.sendMessage(ADMIN_CHAT_ID, "COURSE_CHAT_ID yozilmagan");
+            await bot.telegram.sendMessage(ctx.from.id, "COURSE_CHAT_ID yozilmagan");
             return;
         }
 
@@ -695,7 +718,7 @@ bot.action(/approve_(.+)/, async (ctx) => {
     }
 });
 bot.action(/reject_(.+)/, async (ctx) => {
-    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+    if (!isAdmin(ctx.from.id)) {
         try { await ctx.answerCbQuery("Siz admin emassiz"); } catch (_) {}
         return;
     }
@@ -706,7 +729,7 @@ bot.action(/reject_(.+)/, async (ctx) => {
     try {
         const payment = await findPaymentById(paymentId);
         if (!payment) {
-            await bot.telegram.sendMessage(ADMIN_CHAT_ID, "To'lov topilmadi");
+            await bot.telegram.sendMessage(ctx.from.id, "To'lov topilmadi");
             return;
         }
 
@@ -735,7 +758,7 @@ bot.action(/reject_(.+)/, async (ctx) => {
     }
 });
 bot.command("admin", async (ctx) => {
-    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+    if (!isAdmin(ctx.from.id)) {
         await ctx.reply("❌ Siz admin emassiz");
         return;
     }
@@ -758,7 +781,7 @@ bot.command("admin", async (ctx) => {
 });
 
 bot.command("payments", async (ctx) => {
-    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+    if (!isAdmin(ctx.from.id)) {
         await ctx.reply("❌ Siz admin emassiz");
         return;
     }
@@ -782,7 +805,7 @@ bot.action("payments_current", async (ctx) => {
 });
 
 bot.action(/payments_page_(\d+)/, async (ctx) => {
-    if (String(ctx.from.id) !== ADMIN_CHAT_ID) {
+    if (!isAdmin(ctx.from.id)) {
         await ctx.answerCbQuery("Siz admin emassiz");
         return;
     }
