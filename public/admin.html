@@ -87,6 +87,45 @@
         .input:focus {
             border-color: var(--primary);
         }
+
+        .textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .form-field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-field-full {
+            grid-column: 1 / -1;
+        }
+
+        .form-label {
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .form-field .input {
+            margin: 0;
+        }
+
+        .status-text {
+            color: var(--muted);
+            font-size: 14px;
+            margin-top: 12px;
+            min-height: 20px;
+        }
         
         .btn {
             border: none;
@@ -341,6 +380,10 @@
             .mobile-list {
                 display: flex;
             }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
             
             .pagination {
                 align-items: stretch;
@@ -442,6 +485,60 @@
                 </div>
             </div>
         </div>
+
+        <div id="settingsBox" class="card hidden" style="margin-top:16px;">
+            <div class="header-row">
+                <div>
+                    <div class="section-title">Bot sozlamalari</div>
+                    <div class="muted">Karta, video, rasmlar va kurs xabarini shu yerdan o‘zgartiring.</div>
+                </div>
+                <button id="saveSettingsBtn" class="btn" onclick="saveSettings()">Saqlash</button>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-field">
+                    <label class="form-label" for="cardNumberInput">Karta raqami</label>
+                    <input id="cardNumberInput" class="input" placeholder="9860170103933454" />
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="ofertaUrlInput">Oferta URL</label>
+                    <input id="ofertaUrlInput" class="input" placeholder="/oferta" />
+                </div>
+                <div class="form-field form-field-full">
+                    <label class="form-label" for="courseJoinMessageInput">Kursga qo‘shilishdan oldingi xabar</label>
+                    <textarea id="courseJoinMessageInput" class="input textarea"></textarea>
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="bonusVideoInput">Bonus video file_id yoki URL</label>
+                    <input id="bonusVideoInput" class="input" />
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="recordVideoInput">Zapis video file_id yoki URL</label>
+                    <input id="recordVideoInput" class="input" />
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="infoImage1Input">Rasm 1 file_id yoki URL</label>
+                    <input id="infoImage1Input" class="input" />
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="infoImage2Input">Rasm 2 file_id yoki URL</label>
+                    <input id="infoImage2Input" class="input" />
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="infoImage3Input">Rasm 3 file_id yoki URL</label>
+                    <input id="infoImage3Input" class="input" />
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="infoImage4Input">Rasm 4 file_id yoki URL</label>
+                    <input id="infoImage4Input" class="input" />
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="infoImage5Input">Rasm 5 file_id yoki URL</label>
+                    <input id="infoImage5Input" class="input" />
+                </div>
+            </div>
+            <div id="settingsStatus" class="status-text"></div>
+        </div>
     </div>
     
     <script>
@@ -459,7 +556,7 @@
             
             adminPassword = value;
             localStorage.setItem("admin_panel_password", adminPassword);
-            loadPayments();
+            loadDashboard();
         }
         
         function logout() {
@@ -468,7 +565,15 @@
             currentPage = 1;
             
             document.getElementById("tableBox").classList.add("hidden");
+            document.getElementById("settingsBox").classList.add("hidden");
             document.getElementById("loginBox").classList.remove("hidden");
+        }
+
+        function getAuthHeaders(extra = {}) {
+            return {
+                "x-admin-password": adminPassword,
+                ...extra
+            };
         }
         
         function formatDate(dateString) {
@@ -576,13 +681,12 @@
         async function loadPayments() {
             try {
                 const res = await fetch(`/admin/api/payments?page=${currentPage}&limit=${limit}`, {
-                    headers: {
-                        "x-admin-password": adminPassword
-                    }
+                    headers: getAuthHeaders()
                 });
                 
                 if (res.status === 401) {
                     document.getElementById("tableBox").classList.add("hidden");
+                    document.getElementById("settingsBox").classList.add("hidden");
                     document.getElementById("loginBox").classList.remove("hidden");
                     alert("Parol noto‘g‘ri");
                     return;
@@ -592,6 +696,7 @@
                 
                 document.getElementById("loginBox").classList.add("hidden");
                 document.getElementById("tableBox").classList.remove("hidden");
+                document.getElementById("settingsBox").classList.remove("hidden");
                 
                 const isEmpty = !data.items || data.items.length === 0;
                 document.getElementById("emptyState").classList.toggle("hidden", !isEmpty);
@@ -610,6 +715,83 @@
                 console.error(error);
             }
         }
+
+        function setSettingsForm(data) {
+            document.getElementById("cardNumberInput").value = data.cardNumber || "";
+            document.getElementById("ofertaUrlInput").value = data.ofertaUrl || "";
+            document.getElementById("courseJoinMessageInput").value = data.courseJoinMessage || "";
+            document.getElementById("bonusVideoInput").value = data.bonusVideo || "";
+            document.getElementById("recordVideoInput").value = data.recordVideo || "";
+            
+            const images = Array.isArray(data.infoImages) ? data.infoImages : [];
+            for (let index = 0; index < 5; index += 1) {
+                document.getElementById(`infoImage${index + 1}Input`).value = images[index] || "";
+            }
+        }
+
+        function getSettingsForm() {
+            return {
+                cardNumber: document.getElementById("cardNumberInput").value.trim(),
+                ofertaUrl: document.getElementById("ofertaUrlInput").value.trim(),
+                courseJoinMessage: document.getElementById("courseJoinMessageInput").value.trim(),
+                bonusVideo: document.getElementById("bonusVideoInput").value.trim(),
+                recordVideo: document.getElementById("recordVideoInput").value.trim(),
+                infoImages: [1, 2, 3, 4, 5].map((number) =>
+                    document.getElementById(`infoImage${number}Input`).value.trim()
+                )
+            };
+        }
+
+        async function loadSettings() {
+            const status = document.getElementById("settingsStatus");
+            try {
+                status.textContent = "Sozlamalar yuklanmoqda...";
+                const res = await fetch("/admin/api/settings", {
+                    headers: getAuthHeaders()
+                });
+                
+                if (!res.ok) throw new Error("Sozlamalarni yuklab bo‘lmadi");
+                
+                setSettingsForm(await res.json());
+                status.textContent = "";
+            } catch (error) {
+                status.textContent = "Sozlamalarni yuklab bo‘lmadi.";
+                console.error(error);
+            }
+        }
+
+        async function saveSettings() {
+            const status = document.getElementById("settingsStatus");
+            const button = document.getElementById("saveSettingsBtn");
+            
+            try {
+                button.disabled = true;
+                status.textContent = "Saqlanmoqda...";
+                
+                const res = await fetch("/admin/api/settings", {
+                    method: "PUT",
+                    headers: getAuthHeaders({
+                        "Content-Type": "application/json"
+                    }),
+                    body: JSON.stringify(getSettingsForm())
+                });
+                
+                if (!res.ok) throw new Error("Sozlamalarni saqlab bo‘lmadi");
+                
+                setSettingsForm(await res.json());
+                status.textContent = "Sozlamalar saqlandi.";
+            } catch (error) {
+                status.textContent = "Sozlamalarni saqlab bo‘lmadi.";
+                console.error(error);
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        function loadDashboard() {
+            loadPayments();
+            loadSettings();
+        }
         
         function changePage(direction) {
             currentPage += direction;
@@ -618,7 +800,7 @@
         }
         
         if (adminPassword) {
-            loadPayments();
+            loadDashboard();
         }
     </script>
 </body>

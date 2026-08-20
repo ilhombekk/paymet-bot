@@ -74,9 +74,88 @@ const paymentSchema = new mongoose.Schema(
 
 const Payment = mongoose.model("Payment", paymentSchema);
 
+const DEFAULT_SETTINGS = {
+    cardNumber: CARD_NUMBER,
+    ofertaUrl: OFERTA_URL,
+    bonusVideo: BONUS_VIDEO_FILE_ID_OR_URL,
+    recordVideo: RECORD_VIDEO_FILE_ID_OR_URL,
+    infoImages: [
+        INFO_IMAGE_1,
+        INFO_IMAGE_2,
+        INFO_IMAGE_3,
+        INFO_IMAGE_4,
+        INFO_IMAGE_5
+    ],
+    courseJoinMessage:
+        "Buxgalteriya onlayn kurs narxi 2mln so'm.\n" +
+        "10 kun ichida to'lov qilgan o'quvchiga chegirmada 1,5mln so'm.\n\n" +
+        "Shoshiling, joylar soni atigi 10ta.\n\n" +
+        "Kursga qo‘shilish uchun tugmani bosing:"
+};
+
+const settingsSchema = new mongoose.Schema(
+    {
+        _id: { type: String, default: "main" },
+        cardNumber: { type: String, default: DEFAULT_SETTINGS.cardNumber },
+        ofertaUrl: { type: String, default: DEFAULT_SETTINGS.ofertaUrl },
+        bonusVideo: { type: String, default: DEFAULT_SETTINGS.bonusVideo },
+        recordVideo: { type: String, default: DEFAULT_SETTINGS.recordVideo },
+        infoImages: { type: [String], default: DEFAULT_SETTINGS.infoImages },
+        courseJoinMessage: { type: String, default: DEFAULT_SETTINGS.courseJoinMessage }
+    },
+    {
+        versionKey: false,
+        timestamps: true
+    }
+);
+
+const Settings = mongoose.model("Settings", settingsSchema);
+
 async function connectMongo() {
     await mongoose.connect(MONGO_URI);
     console.log("MongoDB ulandi");
+}
+
+function normalizeSettings(settings = {}) {
+    const infoImages = Array.isArray(settings.infoImages)
+    ? settings.infoImages
+    : DEFAULT_SETTINGS.infoImages;
+    
+    return {
+        cardNumber: settings.cardNumber || DEFAULT_SETTINGS.cardNumber,
+        ofertaUrl: settings.ofertaUrl || DEFAULT_SETTINGS.ofertaUrl,
+        bonusVideo: settings.bonusVideo || "",
+        recordVideo: settings.recordVideo || "",
+        infoImages: [...infoImages, "", "", "", "", ""].slice(0, 5),
+        courseJoinMessage: settings.courseJoinMessage || DEFAULT_SETTINGS.courseJoinMessage
+    };
+}
+
+async function getSettings() {
+    const settings = await Settings.findByIdAndUpdate(
+        "main",
+        { $setOnInsert: DEFAULT_SETTINGS },
+        { upsert: true, returnDocument: "after", lean: true }
+    );
+    
+    return normalizeSettings(settings);
+}
+
+async function saveSettings(patch) {
+    const current = await getSettings();
+    const next = normalizeSettings({
+        ...current,
+        ...patch,
+        infoImages: Array.isArray(patch.infoImages) ? patch.infoImages : current.infoImages
+    });
+    
+    const settings = await Settings.findByIdAndUpdate(
+        "main",
+        { $set: next },
+        { upsert: true, returnDocument: "after", runValidators: true, lean: true }
+    );
+    
+    return normalizeSettings(settings);
 }
 
 function getSession(userId) {
@@ -144,14 +223,6 @@ async function sendPhotoToAdmins(fileId, extra) {
             })
         )
     );
-}
-
-function getFullOfertaUrl(req) {
-    const base = `${req.protocol}://${req.get("host")}`;
-    if (OFERTA_URL.startsWith("http://") || OFERTA_URL.startsWith("https://")) {
-        return OFERTA_URL;
-    }
-    return `${base}${OFERTA_URL}`;
 }
 
 async function createPaymentRequest(user) {
@@ -306,13 +377,8 @@ async function sendVideoByIdOrUrl(ctx, value, caption = "") {
 }
 
 async function sendIntroImages(ctx) {
-    const images = [
-        INFO_IMAGE_1,
-        INFO_IMAGE_2,
-        INFO_IMAGE_3,
-        INFO_IMAGE_4,
-        INFO_IMAGE_5
-    ].filter(Boolean);
+    const settings = await getSettings();
+    const images = settings.infoImages.filter(Boolean);
     
     if (!images.length) {
         await ctx.reply("Kurs rasmlari hozircha yuklanmagan.");
@@ -451,7 +517,8 @@ bot.action("show_bonus_lesson", async (ctx) => {
     
     await ctx.answerCbQuery();
     
-    await sendVideoByIdOrUrl(ctx, BONUS_VIDEO_FILE_ID_OR_URL, "🎁 Bonus darslik");
+    const settings = await getSettings();
+    await sendVideoByIdOrUrl(ctx, settings.bonusVideo, "🎁 Bonus darslik");
     
     await ctx.reply(
         "Videoni ko‘rib bo‘lgach, davom etish tugmasini bosing:",
@@ -474,14 +541,12 @@ bot.action("show_course_materials", async (ctx) => {
     
     await ctx.answerCbQuery();
     
+    const settings = await getSettings();
     await sendIntroImages(ctx);
-    await sendVideoByIdOrUrl(ctx, RECORD_VIDEO_FILE_ID_OR_URL, "🎥 Kurs bo‘yicha zapis video");
+    await sendVideoByIdOrUrl(ctx, settings.recordVideo, "🎥 Kurs bo‘yicha zapis video");
     
     await ctx.reply(
-        "Buxgalteriya onlayn kurs narxi 2mln so'm.\n" +
-        "10 kun ichida to'lov qilgan o'quvchiga chegirmada 1,5mln so'm.\n\n" +
-        "Shoshiling, joylar soni atigi 10ta.\n\n" +
-        "Kursga qo‘shilish uchun tugmani bosing:",
+        settings.courseJoinMessage,
         Markup.inlineKeyboard([
             [Markup.button.callback("📚 Kursga qo‘shilish", "join_course_offer")]
         ])
@@ -501,12 +566,12 @@ bot.action("join_course_offer", async (ctx) => {
     
     await ctx.answerCbQuery();
     
-    const host = ctx.webhookReply ? "" : "";
+    const settings = await getSettings();
     const baseUrl = process.env.BASE_URL;
     
-    const ofertaLink = OFERTA_URL.startsWith("http")
-    ? OFERTA_URL
-    : `${baseUrl}${OFERTA_URL}`;
+    const ofertaLink = settings.ofertaUrl.startsWith("http")
+    ? settings.ofertaUrl
+    : `${baseUrl}${settings.ofertaUrl}`;
     
     await ctx.reply(
         "📄 Kursga qo‘shilishdan oldin oferta bilan tanishing:",
@@ -524,9 +589,10 @@ bot.action("accept_offer", async (ctx) => {
     session.step = "awaiting_screenshot";
     
     await ctx.answerCbQuery();
+    const settings = await getSettings();
     
     await ctx.reply(
-        `💳 To‘lov uchun karta raqami:\n\n${CARD_NUMBER}\n\nTo‘lov qilganingizdan keyin skrinshot yuboring.`
+        `💳 To‘lov uchun karta raqami:\n\n${settings.cardNumber}\n\nTo‘lov qilganingizdan keyin skrinshot yuboring.`
     );
 });
 
@@ -602,7 +668,7 @@ bot.on("photo", async (ctx, next) => {
         const fileId = largestPhoto.file_id;
         
         await ctx.reply(
-            `🖼 Rasm file_id:\n\n${fileId}\n\nShuni INFO_IMAGE_1, INFO_IMAGE_2, INFO_IMAGE_3, INFO_IMAGE_4 yoki INFO_IMAGE_5 ga yozing.`
+            `🖼 Rasm file_id:\n\n${fileId}\n\nShuni admin paneldagi rasmlar maydoniga yozing.`
         );
     } catch (error) {
         console.error("Rasm file_id olishda xato:", error);
@@ -625,7 +691,7 @@ bot.on("video", async (ctx, next) => {
         const fileId = video.file_id;
         
         await ctx.reply(
-            `🎥 Video file_id:\n\n${fileId}\n\nBonus video uchun BONUS_VIDEO_FILE_ID_OR_URL ga, zapis video uchun RECORD_VIDEO_FILE_ID_OR_URL ga yozing.`
+            `🎥 Video file_id:\n\n${fileId}\n\nShuni admin paneldagi bonus yoki zapis video maydoniga yozing.`
         );
     } catch (error) {
         console.error("Video file_id olishda xato:", error);
@@ -644,7 +710,7 @@ bot.on("message", async (ctx, next) => {
         if (msg.document && msg.document.mime_type?.startsWith("video/")) {
             return ctx.reply(
                 `🎥 Video document file_id:\n\n${msg.document.file_id}\n\n` +
-                `Bonus video uchun BONUS_VIDEO_FILE_ID_OR_URL ga yoki zapis video uchun RECORD_VIDEO_FILE_ID_OR_URL ga yozing.`
+                `Shuni admin paneldagi bonus yoki zapis video maydoniga yozing.`
             );
         }
         
@@ -854,6 +920,38 @@ app.get("/admin", (req, res) => {
 
 app.get("/oferta", (req, res) => {
     res.sendFile(path.join(__dirname, "public", "oferta.html"));
+});
+
+app.get("/admin/api/settings", checkAdminPanelAuth, async (req, res) => {
+    try {
+        res.json(await getSettings());
+    } catch (error) {
+        console.error("Sozlamalarni olishda xato:", error);
+        res.status(500).json({ error: "Server xatosi" });
+    }
+});
+
+app.put("/admin/api/settings", checkAdminPanelAuth, async (req, res) => {
+    try {
+        const body = req.body || {};
+        const infoImages = Array.isArray(body.infoImages)
+        ? body.infoImages.map((item) => String(item || "").trim()).slice(0, 5)
+        : undefined;
+        
+        const settings = await saveSettings({
+            cardNumber: String(body.cardNumber || "").trim(),
+            ofertaUrl: String(body.ofertaUrl || "").trim(),
+            bonusVideo: String(body.bonusVideo || "").trim(),
+            recordVideo: String(body.recordVideo || "").trim(),
+            courseJoinMessage: String(body.courseJoinMessage || "").trim(),
+            ...(infoImages ? { infoImages } : {})
+        });
+        
+        res.json(settings);
+    } catch (error) {
+        console.error("Sozlamalarni saqlashda xato:", error);
+        res.status(500).json({ error: "Server xatosi" });
+    }
 });
 
 app.get("/admin/api/payments", checkAdminPanelAuth, async (req, res) => {
